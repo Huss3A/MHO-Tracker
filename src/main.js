@@ -195,7 +195,7 @@ function viewDetail() {
 <div class="card">
   <div class="row mb">${[['SSR', 'SSR'], ['SR', 'SR'], ['R', 'R'], ['', 'All']].map(([k, l]) => `<button data-filter="${k}" class="pill ${k} ${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="scroll"><table class="rec"><tr><th>Name</th><th>Time (UTC+3)</th><th class="r">Pity</th></tr>
-  ${rows.map((p) => `<tr><td class="${p.rarity}">${esc(p.name)}<div class="note">${esc(p.type)}${tag(p) ? ' &middot; ' + esc(tag(p)) : ''}</div></td><td class="mono">${esc(p.time)}</td><td class="r">${p.rarity === 'SSR' ? `<b class="pc-${colOf(p.pity, rl.ssrPity)}">${p.pity}</b>` : p.rarity === 'SR' ? p.srPity : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Nothing here.</td></tr>'}</table></div>
+  ${rows.map((p) => `<tr><td class="${esc(p.rarity)}">${esc(p.name)}<div class="note">${esc(p.type)}${tag(p) ? ' &middot; ' + esc(tag(p)) : ''}</div></td><td class="mono">${esc(p.time)}</td><td class="r">${p.rarity === 'SSR' ? `<b class="pc-${colOf(p.pity, rl.ssrPity)}">${p.pity}</b>` : p.rarity === 'SR' ? p.srPity : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Nothing here.</td></tr>'}</table></div>
 </div>
 <button class="danger" id="del-banner">Delete ${esc(banner)} history</button>`;
 }
@@ -340,7 +340,8 @@ async function runSync(mode) {
     }
     sbusy = 'Syncing...'; render();
     const res = await drive.sync(state.pulls, mode);
-    if (mode !== 'push') { state.pulls = res.pulls; await save(); }
+    // merge: fold in anything added locally (e.g. a screenshot import) while the Drive request was running
+    if (mode !== 'push') { state.pulls = mode === 'merge' ? mergePulls(state.pulls, res.pulls) : res.pulls; await save(); }
     slog = `Done. Drive had ${res.remoteCount}, this device had ${res.localCount}, now ${res.pulls.length} pulls.`;
   } catch (e) { return fail(e); }
   sbusy = ''; render();
@@ -381,13 +382,15 @@ function wire() {
   on('#jsonimport', () => $('#jsonfile').click());
   const jf = $('#jsonfile');
   if (jf) jf.onchange = async () => {
-    try { const add = parseImport(await jf.files[0].text()); jf.value = ''; const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); dlog = `Imported. ${state.pulls.length - n} new pull(s).`; }
+    const f = jf.files[0]; jf.value = '';   // reset first so the same file can be picked again after an error
+    if (!f) return;
+    try { const add = parseImport(await f.text()); const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); dlog = `Imported. ${state.pulls.length - n} new pull(s).`; }
     catch (e) { dlog = 'Import failed: ' + e.message; }
     render();
   };
   on('#wipe', async () => {
     const ok = await confirmDestructive({ title: 'Delete everything on this device?', intro: 'All pulls and settings stored in this browser will be removed. The Drive copy is untouched until you sync or overwrite.', rows: sumHtml('This device', summarisePulls(state.pulls)), risk: null, confirmLabel: 'Delete everything' });
-    if (ok) { state.pulls = []; save(); dlog = 'Everything on this device was deleted.'; render(); }
+    if (ok) { state.pulls = []; state.settings = { clientId: '', rules: {} }; save(); dlog = 'Everything on this device was deleted.'; render(); }
   });
   on('#savecid', () => { state.settings.clientId = $('#cid').value.trim(); save(); render(); });
   on('#sync', () => runSync('merge'));

@@ -39,10 +39,17 @@ export const exportJson = (s) =>
   JSON.stringify({ app: 'mho-recruit-tracker', version: 1, exportedAt: new Date().toISOString(), pulls: s.pulls }, null, 1);
 
 const TIME_RE = /^\d{4}\/\d\d\/\d\d \d\d:\d\d:\d\d$/;
+const str = (v) => typeof v === 'string';
+const int = (v) => (Number.isInteger(v) ? v : null);
+/** Validate untrusted pulls (JSON import, Drive file): keep only well-formed rows, copy known fields with the right types. */
+export function cleanPulls(list) {
+  if (!Array.isArray(list)) throw new Error('Not a tracker file (no "pulls" array).');
+  return list
+    .filter((p) => p && str(p.banner) && p.banner && str(p.time) && TIME_RE.test(p.time) && str(p.name) && ['SSR', 'SR', 'R'].includes(p.rarity))
+    .map((p, i) => ({ banner: p.banner, time: p.time, idx: Number.isInteger(p.idx) ? p.idx : i, type: str(p.type) ? p.type : '', name: p.name, rarity: p.rarity, page: int(p.page), row: int(p.row) }));
+}
 export function parseImport(text) {
   const j = JSON.parse(text);
   if (!j || !Array.isArray(j.pulls)) throw new Error('Not a tracker export (no "pulls" array).');
-  return j.pulls
-    .filter((p) => p && p.banner && TIME_RE.test(p.time) && p.name && ['SSR', 'SR', 'R'].includes(p.rarity))
-    .map((p, i) => ({ banner: p.banner, time: p.time, idx: Number.isInteger(p.idx) ? p.idx : i, type: p.type || '', name: p.name, rarity: p.rarity, page: p.page ?? null, row: p.row ?? null }));
+  return cleanPulls(j.pulls);
 }

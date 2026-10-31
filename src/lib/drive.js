@@ -3,6 +3,7 @@
 // The OAuth Client ID is public config (not a secret); see README for how to create one.
 import { mergePulls } from './merge.js';
 import { summarisePulls } from './overwrite.js';
+import { cleanPulls } from './store.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE = 'mho-tracker-data.json';
@@ -61,7 +62,12 @@ async function findFile() {
   const j = await (await api(`/drive/v3/files?spaces=appDataFolder&q=${q}&fields=files(id,modifiedTime)`)).json();
   return j.files?.[0] || null;
 }
-const download = async (id) => (await api(`/drive/v3/files/${id}?alt=media`)).json();
+// the Drive file is untrusted input: validate it like a JSON import before it can reach the table or IndexedDB
+async function download(id) {
+  const d = await (await api(`/drive/v3/files/${id}?alt=media`)).json();
+  if (!d || typeof d !== 'object') throw new Error('The Drive file is not valid tracker data.');
+  return { ...d, pulls: cleanPulls(d.pulls ?? []) };
+}
 
 async function upload(id, pulls) {
   const body = JSON.stringify({ app: 'mho-recruit-tracker', version: 1, savedAt: new Date().toISOString(), pulls });
