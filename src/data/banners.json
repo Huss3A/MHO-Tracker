@@ -1,0 +1,9 @@
+{
+  "_comment": "Banner schedule. Edit this file (or send a pull request) when a new banner is announced, then rebuild. start/end are calendar dates in server time; the banner runs from 00:00 on start until the END OF the end date. 'type' must match the Recruitment History banner name (Featured, Rotating, ...) or be null when unknown. 'confirmed:false' = dates/times not verified in game.",
+  "timezone": "+03:00",
+  "banners": [
+    { "id": "midori-2026-10", "name": "Midori", "type": "Featured", "start": "2026-10-29", "end": "2026-11-26", "confirmed": true },
+    { "id": "rhodes-2026-10", "name": "Rhodes", "type": "Rotating", "start": "2026-10-29", "end": "2026-11-26", "confirmed": true },
+    { "id": "freya-2026-11", "name": "Freya", "type": null, "start": "2026-11-27", "end": "2027-01-21", "confirmed": true }
+  ]
+}

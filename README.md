@@ -61,6 +61,12 @@ private file (`mho-tracker-data.json`) - nothing else in your Drive. A Client ID
 
 > Status: the Drive code path is implemented but **untested against Google** (no client ID existed when it was written).
 
+## Banner schedule and 120-pull guarantee
+`src/data/banners.json` lists each banner (name, type, start date, end date, server time UTC+3). A banner runs from 00:00 on
+its start date to the end of its end date. The **Banners** tab shows live/upcoming banners with countdowns and your progress;
+every pull on that banner type made inside the period counts toward the 120-pull guarantee of that banner, regardless of
+the pull results. To add a banner, append an entry to the JSON and rebuild (`npm run build`).
+
 ## Pity rules
 `src/data/rules.js`. Values from the game's own English strings (`Lottery` namespace of `en_Game.locres`):
 

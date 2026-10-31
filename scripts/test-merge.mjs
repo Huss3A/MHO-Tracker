@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { mergeChunk, mergePulls } from '../src/lib/merge.js';
 import { analyse } from '../src/lib/pity.js';
+import { loadSchedule, periodFor, periodStats, stateOf, pullMs, fmtCountdown } from '../src/lib/banners.js';
 
 const T = '2026/10/29 05:38:11';
 const r = (name, row, rarity = 'R', time = T) => ({ row, type: 'Buddy', name, rarity, time });
@@ -36,4 +37,27 @@ assert.equal(mergeChunk(s, 'Rotating', 1, newer).pulls.length, 11);
 const t = (time, rarity) => ({ banner: 'Standard', time, idx: 0, type: 'Buddy', name: 'x', rarity });
 const a = analyse([t('2026/01/01 00:00:03', 'SSR'), t('2026/01/01 00:00:02', 'SR'), t('2026/01/01 00:00:01', 'R')], 'Standard');
 assert.equal(a.list[0].pity, 3); assert.equal(a.sinceSSR, 0); assert.equal(a.ssrLeft, 90);
+
+// banner schedule: periods, inclusive end date, per-period 120 count
+const sch = loadSchedule({ timezone: '+03:00', banners: [
+  { name: 'Midori', type: 'Featured', start: '2026-10-29', end: '2026-11-26' },
+  { name: 'Freya', type: 'Featured', start: '2026-11-27', end: '2027-01-21' }] });
+assert.equal(periodFor(sch, 'Featured', '2026/11/26 23:59:59').name, 'Midori', 'end date is inclusive');
+assert.equal(periodFor(sch, 'Featured', '2026/11/27 00:00:00').name, 'Freya');
+assert.equal(periodFor(sch, 'Featured', '2026/10/28 23:59:59'), null);
+assert.equal(periodFor(sch, 'Rotating', '2026/11/01 00:00:00'), null, 'banner type must match');
+assert.equal(stateOf(sch[0], pullMs('2026/11/01 00:00:00')), 'live');
+assert.equal(stateOf(sch[1], pullMs('2026/11/01 00:00:00')), 'upcoming');
+assert.equal(fmtCountdown(90061000), '1d 01:01:01');
+const fp = (i, rarity, name = 'x') => ({ banner: 'Featured', time: `2026/11/01 ${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}:00`, idx: 0, type: 'Adventurer', name, rarity });
+const ps = [];
+for (let i = 0; i < 50; i++) ps.push(fp(i, 'R'));
+ps.push(fp(50, 'SSR', 'Other'));
+for (let i = 51; i < 100; i++) ps.push(fp(i, 'R'));
+let st = periodStats(ps, sch[0]);
+assert.equal(st.count, 100); assert.equal(st.toGuarantee, 20); assert.equal(st.gotFeatured, false); assert.equal(st.ssr, 1);
+ps.push(fp(100, 'SSR', 'Midori'));
+st = periodStats(ps, sch[0]);
+assert.equal(st.featuredAt, 101); assert.equal(st.gotFeatured, true); assert.equal(st.toGuarantee, 0);
+assert.equal(periodStats(ps, sch[1]).count, 0, 'pulls of another period are not counted');
 console.log('all merge/pity tests passed');

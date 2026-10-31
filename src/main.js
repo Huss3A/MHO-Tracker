@@ -6,6 +6,11 @@ import { loadState, saveState, exportJson, parseImport } from './lib/store.js';
 import * as drive from './lib/drive.js';
 import { BANNER_NAMES, BANNERS } from './data/rules.js';
 import { CONFIG } from './config.js';
+import bannersJson from './data/banners.json';
+import { loadSchedule, stateOf, periodStats, fmtCountdown } from './lib/banners.js';
+
+const SCHEDULE = loadSchedule(bannersJson);
+const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -69,13 +74,44 @@ ${results.map((r, i) => `
 </div>`).join('')}
 ${results.some((r) => r.status !== 'failed') ? `<div class="row"><button class="primary" id="commit">Add to my table</button><button id="clear-res">Discard</button></div>` : ''}`;
 
+const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
+
+/** 120-pull featured guarantee for the live banner of the selected type (all pulls in the period count) */
+function periodCard() {
+  const now = Date.now();
+  const b = SCHEDULE.find((x) => x.type === banner && stateOf(x, now) === 'live');
+  if (!b) return '';
+  const st = periodStats(state.pulls, b, state.settings.rules);
+  return `<h2>${esc(b.name)} banner: ${st.count} / ${st.limit}</h2>${bar(st.count, st.limit)}
+  <div class="note">${st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained at pull ${st.featuredAt} of this banner.</span>`
+    : st.guaranteeReached ? `<span class="warn">${st.limit} pulls reached but no ${esc(b.name)} recorded - maybe obtained outside the table or an OCR name error.</span>`
+    : `${esc(b.name)} guaranteed in ${st.toGuarantee} more pull(s) (every pull on this banner counts, whatever its result). Ends in <b data-countdown="${b.endMs}">${fmtCountdown(b.endMs - now)}</b>.`}</div>`;
+}
+
+function viewBanners() {
+  const now = Date.now();
+  const order = { live: 0, upcoming: 1, ended: 2 };
+  const list = SCHEDULE.slice().sort((a, b) => order[stateOf(a, now)] - order[stateOf(b, now)] || a.startMs - b.startMs);
+  return `<div class="card"><h2>Banner schedule</h2>
+  <p class="note">From <code>src/data/banners.json</code> (server time UTC+3, shown in your local time). Counting follows the banner period: every pull on that banner type made while it runs counts toward its ${120}-pull guarantee.</p></div>
+  ${list.map((b) => {
+    const s = stateOf(b, now), st = b.type ? periodStats(state.pulls, b, state.settings.rules) : null;
+    return `<div class="card"><div class="row"><b class="grow">${esc(b.name)}</b>
+      <span class="badge ${s === 'live' ? 'ok' : s === 'upcoming' ? 'warn' : ''}">${s === 'live' ? 'live' : s === 'upcoming' ? 'upcoming' : 'ended'}</span>
+      <span class="note">${esc(b.type || 'type not set yet')}</span></div>
+    <div class="note">${fmtDate(b.startMs)} &rarr; ${fmtDate(b.endMs)}</div>
+    ${s !== 'ended' ? `<div style="font-size:1.2em;margin:6px 0">${s === 'live' ? 'Ends in' : 'Starts in'} <b data-countdown="${s === 'live' ? b.endMs : b.startMs}">${fmtCountdown((s === 'live' ? b.endMs : b.startMs) - now)}</b></div>` : ''}
+    ${st && (s !== 'upcoming') ? `<div>Your pulls: <b>${st.count} / ${st.limit}</b> &middot; ${st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained (pull ${st.featuredAt})</span>` : s === 'live' ? `${st.toGuarantee} to guaranteed ${esc(b.name)}` : `${esc(b.name)} not obtained`}</div>${bar(st.count, st.limit)}` : ''}
+    </div>`;
+  }).join('')}`;
+}
+
 function viewHistory() {
   const bs = presentBanners();
   if (!bs.length) return '<div class="card">No pulls yet - import a screenshot first.</div>';
   if (!bs.includes(banner)) banner = bs[0];
   const a = analyse(state.pulls.filter((p) => p.banner === banner), banner, state.settings.rules);
   const rl = a.rules;
-  const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
   return `
 <nav>${bs.map((b) => `<button data-banner="${esc(b)}" class="${b === banner ? 'on' : ''}">${esc(b)} (${state.pulls.filter((p) => p.banner === b).length})</button>`).join('')}</nav>
 <div class="card">
@@ -88,6 +124,7 @@ function viewHistory() {
   </div>
   <h2 style="margin-top:14px">SSR pity: ${a.sinceSSR} / ${rl.ssrPity}</h2>${bar(a.sinceSSR, rl.ssrPity)}
   <h2>SR pity: ${a.sinceSR} / ${rl.srPity}</h2>${bar(a.sinceSR, rl.srPity)}
+  ${periodCard()}
   <div class="note">${rl.verified ? 'Rule from the game\'s own text.' : '<span class="warn">Unverified rule (assumed).</span>'} ${esc(rl.note || '')}</div>
 </div>
 <div class="card scroll"><table><tr><th>#</th><th>Name</th><th>Type</th><th>Time (UTC+3)</th></tr>
@@ -116,10 +153,10 @@ ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[
 }
 
 function render() {
-  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : viewData();
+  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'banners' ? viewBanners() : viewData();
   $('#app').innerHTML = `<div class="wrap"><h1>Monster Hunter Outlanders - Recruit Tracker</h1>
 <div class="sub">Reads your Recruitment History screenshots in the browser and keeps the data on your device (and optionally your own Google Drive).</div>
-<nav>${[['import', 'Import'], ['history', 'History & pity'], ['data', 'Data & sync']].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</nav>${view}</div>`;
+<nav>${[['import', 'Import'], ['history', 'History & pity'], ['banners', 'Banners'], ['data', 'Data & sync']].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</nav>${view}</div>`;
   wire();
 }
 
@@ -180,6 +217,8 @@ function wire() {
 }
 
 (async () => { state = await loadState(); render(); })();
+// live countdowns: update text in place so inputs/focus are not disturbed
+setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
 window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk };
 void sortDisplay;
