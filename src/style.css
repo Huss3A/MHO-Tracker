@@ -112,3 +112,5 @@ button.rtip svg{width:56%;height:56%;fill:currentColor;display:block;margin:0}
 button.rtip.hot{background:color-mix(in srgb,var(--SSR) 22%,transparent)}
 button.rtip::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 6px);white-space:nowrap;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:var(--rad);padding:4px 8px;font-size:12px;font-weight:400;box-shadow:0 4px 14px #0005;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
 button.rtip:hover::after,button.rtip:focus-visible::after,button.rtip:focus::after{opacity:1}
+
+kbd{font:inherit;font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel2)}

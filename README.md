@@ -76,7 +76,7 @@ the pull results. To add a banner, append an entry to the JSON and rebuild (`npm
 | Beginner | 50 | every 10 | max 50 recruits |
 | Standard | 90 | every 10 | two SSR Buddies in a row -> next SSR is an Adventurer; free pick after 300 |
 | Featured | 90 (carries over) | every 10 | 50% featured, else next SSR is featured; featured guaranteed within 120 per banner period |
-| Rotating | 90 | every 10 | confirmed by the maintainer's own testing; 120-pull featured guarantee per banner period |
+| Rotating | 90 | every 10 | game text; 120-pull featured guarantee per banner period |
 
 Festival, Limited-Time, Targeted and Standard Buddy are no longer offered in the menu or the rules list. Existing pulls under those names are kept and still show as a card (generic 90/10, no soft pity); the OCR still recognises the names.
 

@@ -60,7 +60,7 @@ function commit() {
 
 const viewImport = () => `
 <div class="card"><h2>Import screenshots</h2>
-  <div class="drop" id="drop"><b>Drop screenshots here</b> or <button id="pick">choose files</button>
+  <div class="drop" id="drop"><b>Drop screenshots here</b>, paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <button id="pick">choose files</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
     <div class="note mt">Game: Recruit &gt; Overview &gt; Recruitment History. One screenshot per table page; several at once is fine.<br>
     Images are read on this device only - they are never uploaded anywhere.</div></div>
@@ -384,6 +384,14 @@ function wire() {
 }
 
 (async () => { state = await loadState(); if (state.pulls.length) tab = 'history'; render(); })();
+// Ctrl+V on the Import page: pasted screenshots go straight to OCR
+document.addEventListener('paste', (e) => {
+  if (tab !== 'import') return;
+  const imgs = [...(e.clipboardData?.items || [])].filter((i) => i.kind === 'file' && i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
+  if (!imgs.length) return;
+  e.preventDefault();
+  processFiles(imgs.map((f, i) => (f.name ? f : new File([f], `pasted-${Date.now()}-${i}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`, { type: f.type }))));
+});
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen) setMenu(false); });
 // live countdowns: update text in place so inputs/focus are not disturbed
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);

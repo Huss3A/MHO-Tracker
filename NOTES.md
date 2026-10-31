@@ -15,7 +15,7 @@
 - Standard: SSR within 90, SR every 10; two SSR Buddies in a row -> next SSR is an Adventurer; free pick after 300.
 - Featured: SSR within 90 (carries across Featured), 50% featured else next SSR featured, featured within 120 per period.
 - Beginner: SSR Adventurer within 50 (max 50 recruits), SR every 10. Buddy banners: SSR 90, SR 10.
-- Rates SSR 0.6 / SR 9.4 / R 90. Rotating 90/10 confirmed by the maintainer's own testing. Festival/Limited-Time/Targeted/Standard Buddy were removed from the menu/rules (stored pulls kept, generic 90/10).
+- Rates SSR 0.6 / SR 9.4 / R 90. Rotating 90/10 (game text). Festival/Limited-Time/Targeted/Standard Buddy were removed from the menu/rules (stored pulls kept, generic 90/10).
 - Soft pity model (unverified by game text): from gacha.gg's calculator data - base 0.6%, +4.27 pts per pull from the 73rd pull, 90th = 100%. The requester expected 75; the calculator says 73 (`softPityStart` in `src/data/rules.js`).
 - Record table: last 6 months or 1000 recruits, times in server time UTC+3.
 
