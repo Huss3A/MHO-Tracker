@@ -32,3 +32,19 @@ export function analyse(pulls, banner, overrides) {
     base: BASE_RATES,
   };
 }
+
+/** Rarity table for a (possibly filtered) list from analyse(): count, share, average pity, split by type. */
+export function summarise(list) {
+  const total = list.length, out = { total };
+  for (const r of ['SSR', 'SR', 'R']) {
+    const items = list.filter((p) => p.rarity === r), key = r === 'SSR' ? 'pity' : r === 'SR' ? 'srPity' : null;
+    const avg = (xs) => (key && xs.length ? xs.reduce((a, p) => a + p[key], 0) / xs.length : null);
+    const types = {};
+    items.forEach((p) => (types[p.type] ||= []).push(p));
+    out[r] = {
+      count: items.length, pct: total ? (items.length / total) * 100 : 0, avg: avg(items),
+      types: Object.entries(types).map(([type, xs]) => ({ type, count: xs.length, pct: total ? (xs.length / total) * 100 : 0, avg: avg(xs) })),
+    };
+  }
+  return out;
+}

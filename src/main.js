@@ -1,13 +1,13 @@
 import './style.css';
 import { createOcr, extractScreenshot } from './lib/ocr.js';
 import { mergeChunk, mergePulls, sortDisplay } from './lib/merge.js';
-import { analyse } from './lib/pity.js';
+import { analyse, summarise } from './lib/pity.js';
 import { loadState, saveState, exportJson, parseImport } from './lib/store.js';
 import * as drive from './lib/drive.js';
 import { BANNER_NAMES, BANNERS } from './data/rules.js';
 import { CONFIG } from './config.js';
 import bannersJson from './data/banners.json';
-import { loadSchedule, stateOf, periodStats, fmtCountdown } from './lib/banners.js';
+import { loadSchedule, stateOf, periodStats, fmtCountdown, pullMs } from './lib/banners.js';
 
 const SCHEDULE = loadSchedule(bannersJson);
 const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -15,7 +15,7 @@ const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', t
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-let state, tab = 'import', banner = null, results = [], busy = '', log = '', ocr = null;
+let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null;
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
 const save = () => saveState(state);
@@ -76,16 +76,15 @@ ${results.some((r) => r.status !== 'failed') ? `<div class="row"><button class="
 
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
 
-/** 120-pull featured guarantee for the live banner of the selected type (all pulls in the period count) */
-function periodCard() {
-  const now = Date.now();
-  const b = SCHEDULE.find((x) => x.type === banner && stateOf(x, now) === 'live');
-  if (!b) return '';
-  const st = periodStats(state.pulls, b, state.settings.rules);
-  return `<h2>${esc(b.name)} banner: ${st.count} / ${st.limit}</h2>${bar(st.count, st.limit)}
-  <div class="note">${st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained at pull ${st.featuredAt} of this banner.</span>`
-    : st.guaranteeReached ? `<span class="warn">${st.limit} pulls reached but no ${esc(b.name)} recorded - maybe obtained outside the table or an OCR name error.</span>`
-    : `${esc(b.name)} guaranteed in ${st.toGuarantee} more pull(s) (every pull on this banner counts, whatever its result). Ends in <b data-countdown="${b.endMs}">${fmtCountdown(b.endMs - now)}</b>.`}</div>`;
+const tile = (title, sub, n, cls = '') => `<div class="tile"><div><div>${title}</div><div class="note">${sub}</div></div><b class="n ${cls}">${n}</b></div>`;
+
+/** 120-pull featured guarantee tile for one banner period (every pull in the period counts) */
+function periodTile(b) {
+  const now = Date.now(), st = periodStats(state.pulls, b, state.settings.rules), live = stateOf(b, now) === 'live';
+  const sub = st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained at pull ${st.featuredAt}</span>`
+    : st.guaranteeReached ? `<span class="warn">${st.limit} reached, no ${esc(b.name)} recorded</span>`
+    : `${esc(b.name)} guaranteed at ${st.limit}` + (live ? ` &middot; ends in <span data-countdown="${b.endMs}">${fmtCountdown(b.endMs - now)}</span>` : '');
+  return tile(`${esc(b.name)} banner`, sub, st.count, st.gotFeatured ? 'ok' : 'SSR') + bar(st.count, st.limit);
 }
 
 function viewBanners() {
@@ -108,27 +107,47 @@ function viewBanners() {
 
 function viewHistory() {
   const bs = presentBanners();
-  if (!bs.length) return '<div class="card">No pulls yet - import a screenshot first.</div>';
+  if (!bs.length) return `<div class="card">No pulls yet. <button class="primary" data-tab="import">Import screenshots</button></div>`;
   if (!bs.includes(banner)) banner = bs[0];
   const a = analyse(state.pulls.filter((p) => p.banner === banner), banner, state.settings.rules);
-  const rl = a.rules;
+  const rl = a.rules, now = Date.now();
+  const periods = SCHEDULE.filter((b) => b.type === banner);
+  if (period && !periods.some((x) => x.id === period)) period = '';
+  const sel = periods.find((x) => x.id === period);
+  const per = sel || periods.find((x) => stateOf(x, now) === 'live');
+  const inSel = (p) => !sel || (pullMs(p.time) >= sel.startMs && pullMs(p.time) < sel.endMs);
+  const view = a.list.filter(inSel);
+  const sm = summarise(view);
+  const tag = (p) => { const x = periods.find((b) => pullMs(p.time) >= b.startMs && pullMs(p.time) < b.endMs); return x ? x.name : ''; };
+  const col = (v, max) => (v / max < 0.5 ? 'g' : v / max < 0.8 ? 'o' : 'r');
+  const rows = view.filter((p) => !filter || p.rarity === filter);
+  const pct = (x) => x.toFixed(2) + '%', av = (x) => (x ? x.toFixed(2) : '-');
+  const srow = (label, r) => `<tr class="${label}"><td>${label}</td><td>${r.count}</td><td>${pct(r.pct)}</td><td>${av(r.avg)}</td></tr>` +
+    (r.types.length > 1 ? r.types.map((t) => `<tr class="${label} sub"><td>&#9492; ${esc(t.type)}</td><td>${t.count}</td><td>${pct(t.pct)}</td><td>${av(t.avg)}</td></tr>`).join('') : '');
+  const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
   return `
-<nav>${bs.map((b) => `<button data-banner="${esc(b)}" class="${b === banner ? 'on' : ''}">${esc(b)} (${state.pulls.filter((p) => p.banner === b).length})</button>`).join('')}</nav>
 <div class="card">
-  <div class="stats">
-    <div class="stat"><b>${a.total}</b><span>total recruits</span></div>
-    <div class="stat"><b class="SSR">${a.cnt.SSR}</b><span>SSR &middot; ${a.rate('SSR').toFixed(2)}% (base ${a.base.SSR}%)</span></div>
-    <div class="stat"><b class="SR">${a.cnt.SR}</b><span>SR &middot; ${a.rate('SR').toFixed(2)}% (base ${a.base.SR}%)</span></div>
-    <div class="stat"><b class="R">${a.cnt.R}</b><span>R &middot; ${a.rate('R').toFixed(2)}% (base ${a.base.R}%)</span></div>
-    <div class="stat"><b>${a.avgSSRPity ? a.avgSSRPity.toFixed(1) : '-'}</b><span>avg pulls per SSR</span></div>
-  </div>
-  <h2 style="margin-top:14px">SSR pity: ${a.sinceSSR} / ${rl.ssrPity}</h2>${bar(a.sinceSSR, rl.ssrPity)}
-  <h2>SR pity: ${a.sinceSR} / ${rl.srPity}</h2>${bar(a.sinceSR, rl.srPity)}
-  ${periodCard()}
-  <div class="note">${rl.verified ? 'Rule from the game\'s own text.' : '<span class="warn">Unverified rule (assumed).</span>'} ${esc(rl.note || '')}</div>
+  <div class="row"><select id="bsel" class="title">${bs.map((b) => `<option value="${esc(b)}" ${b === banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
+    ${periods.length ? `<select id="psel" class="grow"><option value="">All ${esc(banner)} banners</option>${periods.map((x) => `<option value="${x.id}" ${x.id === period ? 'selected' : ''}>${esc(x.name)} &middot; ${esc(x.start)} to ${esc(x.end)}</option>`).join('')}</select>` : ''}</div>
+  <div style="height:10px"></div>
+  ${tile('Lifetime pulls', `${esc(banner)} banner${sel ? ` &middot; list shows ${esc(sel.name)}` : ''}`, a.total)}
+  ${tile('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR')}
+  ${tile('SR pity', `Guaranteed at ${rl.srPity}`, a.sinceSR, 'SR')}
+  ${rl.selectorAt ? tile('Selector', `Free pick at ${rl.selectorAt} recruits${sel300 ? ` &middot; ${sel300} reached so far` : ''}`, a.total % rl.selectorAt) + bar(a.total % rl.selectorAt, rl.selectorAt) : ''}
+  ${rl.featuredPity && per ? periodTile(per) : ''}
+  <div class="note">${rl.verified ? 'Rules from the game\'s own text.' : '<span class="warn">Unverified rules (assumed).</span>'} ${esc(rl.note || '')}${rl.selectorAt ? ' Selector counter = total recruits mod ' + rl.selectorAt + ' (assumed).' : ''}</div>
 </div>
-<div class="card scroll"><table><tr><th>#</th><th>Name</th><th>Type</th><th>Time (UTC+3)</th></tr>
-${a.list.map((p) => `<tr><td>${p.n}</td><td class="${p.rarity}">${esc(p.name)}${p.pity ? `<span class="pity">${p.pity}</span>` : ''}</td><td>${esc(p.type)}</td><td>${esc(p.time)}</td></tr>`).join('')}</table></div>
+<div class="card">
+  <table class="sum"><tr><th>${esc(banner)}</th><th>Total</th><th>Percent</th><th>Pity AVG</th></tr>
+  ${srow('SSR', sm.SSR)}${srow('SR', sm.SR)}${srow('R', sm.R)}</table>
+  <div class="chips">${view.filter((p) => p.rarity === 'SSR').reverse().map((p) => `<span class="chip">${esc(p.name)} <b class="pc-${col(p.pity, rl.ssrPity)}">${p.pity}</b></span>`).join('') || '<span class="note">No SSR yet.</span>'}</div>
+  <div class="note" style="margin-top:6px">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.</div>
+</div>
+<div class="card">
+  <div class="row" style="margin-bottom:8px">${[['SSR', 'SSR'], ['SR', 'SR'], ['R', 'R'], ['', 'All']].map(([k, l]) => `<button data-filter="${k}" class="pill ${k} ${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="scroll"><table class="rec"><tr><th>Name</th><th>Time (UTC+3)</th><th class="r">Pity</th></tr>
+  ${rows.map((p) => `<tr><td class="${p.rarity}">${esc(p.name)}<div class="note">${esc(p.type)}${tag(p) ? ' &middot; ' + esc(tag(p)) : ''}</div></td><td class="mono">${esc(p.time)}</td><td class="r">${p.rarity === 'SSR' ? `<b class="pc-${col(p.pity, rl.ssrPity)}">${p.pity}</b>` : p.rarity === 'SR' ? p.srPity : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Nothing here.</td></tr>'}</table></div>
+</div>
 <button id="del-banner">Delete ${esc(banner)} history</button>`;
 }
 
@@ -152,11 +171,13 @@ ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[
 <td class="${BANNERS[b].verified ? 'ok' : 'warn'}">${BANNERS[b].verified ? 'game text' : 'assumed'}</td></tr>`; }).join('')}</table></div></div>`;
 }
 
+const MENU = [['history', 'Recruit history'], ['import', 'Import screenshots'], ['banners', 'Banner schedule'], ['data', 'Data & sync']];
 function render() {
   const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'banners' ? viewBanners() : viewData();
-  $('#app').innerHTML = `<div class="wrap"><h1>Monster Hunter Outlanders - Recruit Tracker</h1>
-<div class="sub">Reads your Recruitment History screenshots in the browser and keeps the data on your device (and optionally your own Google Drive).</div>
-<nav>${[['import', 'Import'], ['history', 'History & pity'], ['banners', 'Banners'], ['data', 'Data & sync']].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</nav>${view}</div>`;
+  $('#app').innerHTML = `<div class="wrap"><header class="top"><div class="grow"><h1>MH Outlanders - Recruit Tracker</h1>
+<div class="sub">${esc(MENU.find((m) => m[0] === tab)[1])} &middot; screenshots are read on this device only</div></div>
+<div class="menuwrap"><button id="menu" aria-label="Menu" class="icon">&#9776;</button>
+${menuOpen ? `<div class="menu">${MENU.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}</div></header>${view}</div>`;
   wire();
 }
 
@@ -179,8 +200,11 @@ async function runSync(mode) {
 }
 
 function wire() {
-  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; log = ''; render(); }));
-  document.querySelectorAll('[data-banner]').forEach((b) => (b.onclick = () => { banner = b.dataset.banner; render(); }));
+  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; menuOpen = false; log = ''; render(); }));
+  $('#menu').onclick = (e) => { e.stopPropagation(); menuOpen = !menuOpen; render(); };
+  const bsel = $('#bsel'); if (bsel) bsel.onchange = () => { banner = bsel.value; period = ''; render(); };
+  const psel = $('#psel'); if (psel) psel.onchange = () => { period = psel.value; render(); };
+  document.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { filter = b.dataset.filter; render(); }));
   const file = $('#file');
   if (file) {
     $('#pick').onclick = () => file.click();
@@ -216,7 +240,8 @@ function wire() {
   }));
 }
 
-(async () => { state = await loadState(); render(); })();
+(async () => { state = await loadState(); if (state.pulls.length) tab = 'history'; render(); })();
+document.addEventListener('click', (e) => { if (menuOpen && !e.target.closest('.menuwrap')) { menuOpen = false; render(); } });
 // live countdowns: update text in place so inputs/focus are not disturbed
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
