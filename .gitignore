@@ -3,3 +3,6 @@ node_modules
 .env
 .env.*
 !.env.example
+
+# personal game screenshots used for local OCR testing - never commit
+tests/samples/
