@@ -100,3 +100,6 @@ reported in the review step rather than guessed.
 ## Names
 `src/data/names.json` is generated from the game's English localization (`scripts/gen_names.py`); OCR text is snapped
 to it. Unknown names are kept as read and flagged.
+
+## Contributing
+Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
