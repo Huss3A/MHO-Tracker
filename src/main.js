@@ -19,8 +19,9 @@ let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
 const save = () => saveState(state);
+const ALWAYS_SHOWN = ['Featured', 'Rotating', 'Standard'];
 const presentBanners = () => {
-  const seen = [...new Set(state.pulls.map((p) => p.banner))];
+  const seen = [...new Set([...ALWAYS_SHOWN, ...state.pulls.map((p) => p.banner)])];   // Beginner etc. appear once they have pulls
   const rank = (b) => (BANNER_ORDER.includes(b) ? BANNER_ORDER.indexOf(b) : BANNER_ORDER.length);
   return seen.sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
 };
@@ -136,8 +137,8 @@ const chipsOf = (view, ssrPity) => `<div class="chips">${view.filter((p) => p.ra
 /** overview: one card per banner type (like paimon.moe stats); click the title for the full record */
 function viewHistory() {
   const bs = presentBanners();
-  if (!bs.length) return `<div class="card">No pulls yet. <button class="primary" data-tab="import">Import screenshots</button></div>`;
-  return `<div class="grid">${bs.map((b) => {
+  const hint = state.pulls.length ? '' : `<div class="card">No pulls yet. <button class="primary" data-tab="import">Import screenshots</button></div>`;
+  return `${hint}<div class="grid">${bs.map((b) => {
     const a2 = analyse(state.pulls.filter((p) => p.banner === b), b, state.settings.rules), rl = a2.rules;
     return `<div class="card bcard">
       <div class="row"><h2 class="grow bname">${esc(b)}</h2><button data-open="${esc(b)}">Open record &rarr;</button></div>
@@ -149,7 +150,6 @@ function viewHistory() {
 
 function viewDetail() {
   const bs = presentBanners();
-  if (!bs.length) return viewHistory();
   if (!bs.includes(banner)) banner = bs[0];
   const a = analyse(state.pulls.filter((p) => p.banner === banner), banner, state.settings.rules);
   const rl = a.rules, now = Date.now();
