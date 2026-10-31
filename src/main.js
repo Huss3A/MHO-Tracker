@@ -1,6 +1,6 @@
 import './style.css';
 import { createOcr, extractScreenshot } from './lib/ocr.js';
-import { mergeChunk, mergePulls, sortDisplay } from './lib/merge.js';
+import { mergeChunk, mergePulls } from './lib/merge.js';
 import { analyse, summarise } from './lib/pity.js';
 import { loadState, saveState, exportJson, parseImport } from './lib/store.js';
 import * as drive from './lib/drive.js';
@@ -30,14 +30,16 @@ async function getOcr() { return (ocr ||= await createOcr()); }
 
 async function processFiles(files) {
   const imgs = [...files].filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name));
-  if (!imgs.length) return;
+  if (!imgs.length || busy) return;   // one OCR worker only: ignore drops while a batch is running
   busy = 'Loading OCR engine (runs in your browser)...'; render();
-  const o = await getOcr();
-  for (let i = 0; i < imgs.length; i++) {
-    busy = `Reading screenshot ${i + 1}/${imgs.length}: ${imgs[i].name}`; render();
-    try { results.push(await extractScreenshot(imgs[i], o)); }
-    catch (e) { results.push({ fileName: imgs[i].name, status: 'failed', warnings: ['Error: ' + e.message], rows: [] }); }
-  }
+  try {
+    const o = await getOcr();
+    for (let i = 0; i < imgs.length; i++) {
+      busy = `Reading screenshot ${i + 1}/${imgs.length}: ${imgs[i].name}`; render();
+      try { results.push(await extractScreenshot(imgs[i], o)); }
+      catch (e) { results.push({ fileName: imgs[i].name, status: 'failed', warnings: ['Error: ' + e.message], rows: [] }); }
+    }
+  } catch (e) { log = 'Could not start the OCR engine: ' + e.message; }
   busy = ''; render();
 }
 
@@ -58,7 +60,7 @@ const viewImport = () => `
 <div class="card">
   <div class="drop" id="drop"><b>Drop screenshots here</b> or <button id="pick">choose files</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
-    <div class="note" style="margin-top:8px">Game: Recruit &gt; Overview &gt; Recruitment History. One screenshot per table page; several at once is fine.<br>
+    <div class="note mt">Game: Recruit &gt; Overview &gt; Recruitment History. One screenshot per table page; several at once is fine.<br>
     Images are read on this device only - they are never uploaded anywhere.</div></div>
   ${busy ? `<p class="log">${esc(busy)}</p>` : ''}${log ? `<p class="log ok">${esc(log)}</p>` : ''}
 </div>
@@ -66,13 +68,13 @@ ${results.map((r, i) => `
 <div class="card">
   <div class="row"><b class="grow">${esc(r.fileName)}</b>
     <span class="badge ${r.status === 'ok' ? 'ok' : r.status === 'review' ? 'warn' : 'bad'}">${r.status === 'ok' ? 'confident' : r.status === 'review' ? 'please review' : 'failed'}</span></div>
-  ${r.status !== 'failed' ? `<div class="row" style="margin:8px 0">
+  ${r.status !== 'failed' ? `<div class="row mv">
     <label>Banner <select data-b="${i}">${[...new Set([r.banner, ...BANNER_NAMES])].map((b) => `<option ${b === r.banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
     <span class="note">page ${r.page ?? '?'} &middot; ${r.layout?.size} &middot; scale ${r.layout?.scale}</span></div>
   <div class="scroll"><table><tr><th>#</th><th>Type</th><th>Name</th><th>Rarity</th><th>Time (UTC+3)</th></tr>
   ${r.rows.map((w, j) => `<tr><td>${w.row + 1}</td><td>${esc(w.type)}</td>
-    <td><input class="cell ${w.flags.includes('name') ? 'warn' : ''}" data-n="${i}:${j}" value="${esc(w.name)}">${w.suggestion ? `<div class="note">OCR: ${esc(w.nameRaw)} &rarr; ${esc(w.suggestion)}?</div>` : ''}</td>
-    <td><select data-r="${i}:${j}">${['SSR', 'SR', 'R'].map((x) => `<option ${x === w.rarity ? 'selected' : ''}>${x}</option>`).join('')}</select>${w.flags.includes('rarity') ? ' <span class="warn">?</span>' : ''}</td>
+    <td><input class="cell ${w.flags.includes('name') ? 'warn' : ''}" data-n="${i}:${j}" aria-label="Name of row ${w.row + 1}" value="${esc(w.name)}">${w.suggestion ? `<div class="note">OCR: ${esc(w.nameRaw)} &rarr; ${esc(w.suggestion)}?</div>` : ''}</td>
+    <td><select data-r="${i}:${j}" aria-label="Rarity of row ${w.row + 1}">${['SSR', 'SR', 'R'].map((x) => `<option ${x === w.rarity ? 'selected' : ''}>${x}</option>`).join('')}</select>${w.flags.includes('rarity') ? ' <span class="warn">?</span>' : ''}</td>
     <td>${esc(w.time)}</td></tr>`).join('')}</table></div>` : ''}
   ${r.warnings.length ? `<ul class="warns warn">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 </div>`).join('')}
@@ -108,14 +110,14 @@ function viewBanners() {
   const order = { live: 0, upcoming: 1, ended: 2 };
   const list = SCHEDULE.slice().sort((a, b) => order[stateOf(a, now)] - order[stateOf(b, now)] || a.startMs - b.startMs);
   return `<div class="card"><h2>Banner schedule</h2>
-  <p class="note">From <code>src/data/banners.json</code> (server time UTC+3, shown in your local time). Counting follows the banner period: every pull on that banner type made while it runs counts toward its ${120}-pull guarantee.</p></div>
+  <p class="note">From <code>src/data/banners.json</code> (server time UTC+3, shown in your local time). Counting follows the banner period: every pull on that banner type made while it runs counts toward its 120-pull guarantee.</p></div>
   ${list.map((b) => {
     const s = stateOf(b, now), st = b.type ? periodStats(state.pulls, b, state.settings.rules) : null;
     return `<div class="card"><div class="row"><b class="grow">${esc(b.name)}</b>
       <span class="badge ${s === 'live' ? 'ok' : s === 'upcoming' ? 'warn' : ''}">${s === 'live' ? 'live' : s === 'upcoming' ? 'upcoming' : 'ended'}</span>
       <span class="note">${esc(b.type || 'type not set yet')}</span></div>
     <div class="note">${fmtDate(b.startMs)} &rarr; ${fmtDate(b.endMs)}</div>
-    ${s !== 'ended' ? `<div style="font-size:1.2em;margin:6px 0">${s === 'live' ? 'Ends in' : 'Starts in'} <b data-countdown="${s === 'live' ? b.endMs : b.startMs}">${fmtCountdown((s === 'live' ? b.endMs : b.startMs) - now)}</b></div>` : ''}
+    ${s !== 'ended' ? `<div class="big">${s === 'live' ? 'Ends in' : 'Starts in'} <b data-countdown="${s === 'live' ? b.endMs : b.startMs}">${fmtCountdown((s === 'live' ? b.endMs : b.startMs) - now)}</b></div>` : ''}
     ${st && (s !== 'upcoming') ? `<div>Your pulls: <b>${st.count} / ${st.limit}</b> &middot; ${st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained (pull ${st.featuredAt})</span>` : s === 'live' ? `${st.toGuarantee} to guaranteed ${esc(b.name)}` : `${esc(b.name)} not obtained`}</div>${bar(st.count, st.limit)}` : ''}
     </div>`;
   }).join('')}`;
@@ -160,27 +162,26 @@ function viewDetail() {
   const inSel = (p) => !sel || (pullMs(p.time) >= sel.startMs && pullMs(p.time) < sel.endMs);
   const view = a.list.filter(inSel);
   const tag = (p) => { const x = periods.find((b) => pullMs(p.time) >= b.startMs && pullMs(p.time) < b.endMs); return x ? x.name : ''; };
-  const col = (v, max) => (v / max < 0.5 ? 'g' : v / max < 0.8 ? 'o' : 'r');
   const rows = view.filter((p) => !filter || p.rarity === filter);
   return `
 <div class="card">
   <div class="row"><button data-tab="history">&larr; All banners</button><h2 class="bname" style="margin:0">${esc(banner)}</h2>
-    ${periods.length ? `<select id="psel" class="grow"><option value="">All ${esc(banner)} banners</option>${periods.map((x) => `<option value="${x.id}" ${x.id === period ? 'selected' : ''}>${esc(x.name)} &middot; ${esc(x.start)} to ${esc(x.end)}</option>`).join('')}</select>` : ''}</div>
-  <div style="height:10px"></div>
+    ${periods.length ? `<select id="psel" class="grow" aria-label="Banner period"><option value="">All ${esc(banner)} banners</option>${periods.map((x) => `<option value="${x.id}" ${x.id === period ? 'selected' : ''}>${esc(x.name)} &middot; ${esc(x.start)} to ${esc(x.end)}</option>`).join('')}</select>` : ''}</div>
+  <div class="gap"></div>
   ${statBox(a, rl, per, `${esc(banner)} banner${sel ? ` &middot; list shows ${esc(sel.name)}` : ''}`)}
   <div class="note">${rl.verified ? 'Rules from the game\'s own text.' : '<span class="warn">Unverified rules (assumed).</span>'} ${esc(rl.note || '')}${rl.selectorAt ? ' Selector counter = total recruits mod ' + rl.selectorAt + ' (assumed).' : ''}</div>
 </div>
 <div class="card">
   ${sumTable(banner, view, banner)}
   ${chipsOf(view, rl.ssrPity)}
-  <div class="note" style="margin-top:6px">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.</div>
+  <div class="note mt">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.</div>
 </div>
 <div class="card">
-  <div class="row" style="margin-bottom:8px">${[['SSR', 'SSR'], ['SR', 'SR'], ['R', 'R'], ['', 'All']].map(([k, l]) => `<button data-filter="${k}" class="pill ${k} ${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <div class="row mb">${[['SSR', 'SSR'], ['SR', 'SR'], ['R', 'R'], ['', 'All']].map(([k, l]) => `<button data-filter="${k}" class="pill ${k} ${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
   <div class="scroll"><table class="rec"><tr><th>Name</th><th>Time (UTC+3)</th><th class="r">Pity</th></tr>
-  ${rows.map((p) => `<tr><td class="${p.rarity}">${esc(p.name)}<div class="note">${esc(p.type)}${tag(p) ? ' &middot; ' + esc(tag(p)) : ''}</div></td><td class="mono">${esc(p.time)}</td><td class="r">${p.rarity === 'SSR' ? `<b class="pc-${col(p.pity, rl.ssrPity)}">${p.pity}</b>` : p.rarity === 'SR' ? p.srPity : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Nothing here.</td></tr>'}</table></div>
+  ${rows.map((p) => `<tr><td class="${p.rarity}">${esc(p.name)}<div class="note">${esc(p.type)}${tag(p) ? ' &middot; ' + esc(tag(p)) : ''}</div></td><td class="mono">${esc(p.time)}</td><td class="r">${p.rarity === 'SSR' ? `<b class="pc-${colOf(p.pity, rl.ssrPity)}">${p.pity}</b>` : p.rarity === 'SR' ? p.srPity : ''}</td></tr>`).join('') || '<tr><td colspan="3" class="note">Nothing here.</td></tr>'}</table></div>
 </div>
-<button id="del-banner">Delete ${esc(banner)} history</button>`;
+<button class="danger" id="del-banner">Delete ${esc(banner)} history</button>`;
 }
 
 function viewData() {
@@ -188,18 +189,18 @@ function viewData() {
   return `
 <div class="card"><h2>Local data</h2>
   <div class="row"><button id="export">Export JSON</button><button id="import">Import JSON</button><input id="jsonfile" type="file" accept=".json,application/json" hidden>
-  <button id="wipe">Delete everything</button></div>
+  <button class="danger" id="wipe">Delete everything</button></div>
   <p class="note">${state.pulls.length} pulls stored in this browser (IndexedDB). Nothing is stored on any server.</p></div>
 <div class="card"><h2>Google Drive sync</h2>
   <p class="note">Stores one hidden file (<code>mho-tracker-data.json</code>) in this app's private appData folder of your own Google Drive. The app cannot see any other Drive file. Screenshots are never uploaded.</p>
-  <div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" style="width:100%" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>
-  <div class="row" style="margin-top:8px"><button class="primary" id="sync" ${cid ? '' : 'disabled'}>Sync now (merge)</button>
+  <div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" class="cell" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>
+  <div class="row mt"><button class="primary" id="sync" ${cid ? '' : 'disabled'}>Sync now (merge)</button>
     <button id="push" ${cid ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
   ${cid ? '' : '<p class="warn note">No Client ID configured yet - see README "Google Drive setup".</p>'}
   ${busy ? `<p class="log">${esc(busy)}</p>` : ''}${log ? `<p class="log">${esc(log)}</p>` : ''}</div>
 <div class="card"><h2>Pity rules</h2><div class="scroll"><table><tr><th>Banner</th><th>SSR pity</th><th>SR pity</th><th>Source</th></tr>
 ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[b] || {}) }; return `<tr><td>${b}</td>
-<td><input class="cell" style="width:70px" data-rule="${b}:ssrPity" value="${r.ssrPity}"></td><td><input class="cell" style="width:70px" data-rule="${b}:srPity" value="${r.srPity}"></td>
+<td><input class="cell narrow" aria-label="${b} SSR pity" inputmode="numeric" data-rule="${b}:ssrPity" value="${r.ssrPity}"></td><td><input class="cell narrow" aria-label="${b} SR pity" inputmode="numeric" data-rule="${b}:srPity" value="${r.srPity}"></td>
 <td class="${BANNERS[b].verified ? 'ok' : 'warn'}">${BANNERS[b].verified ? 'game text' : 'assumed'}</td></tr>`; }).join('')}</table></div></div>`;
 }
 
@@ -210,25 +211,30 @@ function setMenu(open) {
   $('#drawer')?.classList.toggle('open', open);
   $('#scrim')?.classList.toggle('open', open);
   document.body.style.overflow = open ? 'hidden' : '';
+  $('#menu')?.setAttribute('aria-expanded', String(open));
+  if (open) $('#drawer .item.on, #drawer .item')?.focus();
+  else if ($('#drawer')?.contains(document.activeElement)) $('#menu')?.focus();
 }
 function render() {
+  const fa = document.activeElement, fk = fa && fa !== document.body ? (fa.id ? '#' + fa.id : fa.dataset?.filter != null ? `[data-filter="${fa.dataset.filter}"]` : '') : '';
   const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'detail' ? viewDetail() : tab === 'banners' ? viewBanners() : viewData();
   const bs = presentBanners();
   $('#app').innerHTML = `
 <div class="topbar">
-  ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners">&larr;</button>` : `<button class="icon" id="menu" aria-label="Open menu">&#9776;</button>`}
-  <div class="ttl grow">${esc(pageTitle())}</div>
-  ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu">&#9776;</button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
+  ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners">&larr;</button>` : `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}">&#9776;</button>`}
+  <h1 class="ttl grow">${esc(pageTitle())}</h1>
+  ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}">&#9776;</button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
 </div>
 <div class="scrim ${menuOpen ? 'open' : ''}" id="scrim"></div>
-<aside class="drawer ${menuOpen ? 'open' : ''}" id="drawer" aria-label="Menu">
+<nav class="drawer ${menuOpen ? 'open' : ''}" id="drawer" aria-label="Menu">
   <div class="dhead"><b>MH Outlanders</b><div class="note">Recruit Tracker</div></div>
-  ${MENU.map(([k, l, ic]) => `<button class="item ${tab === k ? 'on' : ''}" data-tab="${k}"><span class="ic">${ic}</span>${l}</button>
-    ${k === 'history' ? bs.map((b) => `<button class="item sub ${tab === 'detail' && banner === b ? 'on' : ''}" data-open="${esc(b)}">${esc(b)}</button>`).join('') : ''}`).join('')}
+  ${MENU.map(([k, l, ic]) => `<button class="item ${tab === k ? 'on' : ''}" data-tab="${k}"${tab === k ? ' aria-current="page"' : ''}><span class="ic" aria-hidden="true">${ic}</span>${l}</button>
+    ${k === 'history' ? bs.map((b) => `<button class="item sub ${tab === 'detail' && banner === b ? 'on' : ''}" data-open="${esc(b)}"${tab === 'detail' && banner === b ? ' aria-current="page"' : ''}>${esc(b)}</button>`).join('') : ''}`).join('')}
   <div class="note dfoot">Screenshots are read on this device only. Nothing is uploaded.</div>
-</aside>
+</nav>
 <div class="wrap">${view}</div>`;
   wire();
+  if (fk) $(fk)?.focus();   // keep keyboard focus across re-renders (filter pills, selects)
 }
 
 function download(name, text) {
@@ -259,7 +265,7 @@ function wire() {
   const file = $('#file');
   if (file) {
     $('#pick').onclick = () => file.click();
-    file.onchange = () => processFiles(file.files);
+    file.onchange = () => { processFiles(file.files); file.value = ''; };
     const d = $('#drop');
     d.ondragover = (e) => { e.preventDefault(); d.classList.add('over'); };
     d.ondragleave = () => d.classList.remove('over');
@@ -271,12 +277,12 @@ function wire() {
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
   on('#clear-res', () => { results = []; render(); });
-  on('#del-banner', () => { if (confirm(`Delete all ${banner} history from this device?`)) { state.pulls = state.pulls.filter((p) => p.banner !== banner); save(); render(); } });
+  on('#del-banner', () => { if (confirm(`Delete all ${banner} history from this device?`)) { state.pulls = state.pulls.filter((p) => p.banner !== banner); save(); tab = 'history'; render(); window.scrollTo(0, 0); } });
   on('#export', () => download('mho-recruit-history.json', exportJson(state)));
   on('#import', () => $('#jsonfile').click());
   const jf = $('#jsonfile');
   if (jf) jf.onchange = async () => {
-    try { const add = parseImport(await jf.files[0].text()); const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); log = `Imported. ${state.pulls.length - n} new pull(s).`; }
+    try { const add = parseImport(await jf.files[0].text()); jf.value = ''; const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); log = `Imported. ${state.pulls.length - n} new pull(s).`; }
     catch (e) { log = 'Import failed: ' + e.message; }
     render();
   };
@@ -287,7 +293,7 @@ function wire() {
   on('#pull', () => confirm('Replace this device\'s data with the Drive copy?') && runSync('pull'));
   document.querySelectorAll('[data-rule]').forEach((i) => (i.onchange = () => {
     const [b, k] = i.dataset.rule.split(':'); const v = parseInt(i.value, 10);
-    if (v > 0) { (state.settings.rules[b] ||= {})[k] = v; save(); }
+    if (v > 0) { (state.settings.rules[b] ||= {})[k] = v; save(); } else render();   // invalid -> restore the stored value
   }));
 }
 
@@ -297,4 +303,4 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
 window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk };
-void sortDisplay;
+
