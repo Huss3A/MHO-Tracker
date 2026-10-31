@@ -31,6 +31,8 @@
 - History is now an overview of one card per banner (rarity table, Win 50:50 row for Featured, SSR chips with pity, counters); "Open record" opens the detail view (period dropdown, tiles, filterable list).
 - Win 50:50 (Featured only) is derived from banners.json periods; assumes the guarantee carries across Featured banners and ignores SSRs outside scheduled periods (ASSUMED).
 
+- Navigation: sticky top bar (menu button, page title, + Import; back arrow on a banner record) and a slide-in side drawer (history with banner shortcuts, import, banner schedule, data & sync). Closes on item tap, backdrop tap, Esc. Verified by DOM behaviour only (no visual check).
+
 ## TODO / ideas
 - Get real samples (other resolution, page 2) and add them to `tests/samples` + a regression script.
 - Banner schedule DONE (`src/data/banners.json`, Banners tab, per-period 120 count). Still open: 50/50 state; confirm Freya's banner type and exact start/end times (dates assumed 00:00 start, end of end-date, UTC+3); confirm Rotating also has the 120 guarantee (user-stated, not in game text).

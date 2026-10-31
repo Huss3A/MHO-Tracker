@@ -194,13 +194,31 @@ ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[
 <td class="${BANNERS[b].verified ? 'ok' : 'warn'}">${BANNERS[b].verified ? 'game text' : 'assumed'}</td></tr>`; }).join('')}</table></div></div>`;
 }
 
-const MENU = [['history', 'Recruit history'], ['import', 'Import screenshots'], ['banners', 'Banner schedule'], ['data', 'Data & sync']];
+const MENU = [['history', 'Recruit history', '\u{1F4DC}'], ['import', 'Import screenshots', '\u{1F4E5}'], ['banners', 'Banner schedule', '\u{1F5D3}'], ['data', 'Data & sync', '☁']];
+const pageTitle = () => (tab === 'detail' ? banner : (MENU.find((m) => m[0] === tab) || MENU[0])[1]);
+function setMenu(open) {
+  menuOpen = open;
+  $('#drawer')?.classList.toggle('open', open);
+  $('#scrim')?.classList.toggle('open', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
 function render() {
   const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'detail' ? viewDetail() : tab === 'banners' ? viewBanners() : viewData();
-  $('#app').innerHTML = `<div class="wrap"><header class="top"><div class="grow"><h1>MH Outlanders - Recruit Tracker</h1>
-<div class="sub">${esc((MENU.find((m) => m[0] === tab) || MENU[0])[1])} &middot; screenshots are read on this device only</div></div>
-<div class="menuwrap"><button id="menu" aria-label="Menu" class="icon">&#9776;</button>
-${menuOpen ? `<div class="menu">${MENU.map(([k, l]) => `<button data-tab="${k}" class="${tab === k || (k === 'history' && tab === 'detail') ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}</div></header>${view}</div>`;
+  const bs = presentBanners();
+  $('#app').innerHTML = `
+<div class="topbar">
+  ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners">&larr;</button>` : `<button class="icon" id="menu" aria-label="Open menu">&#9776;</button>`}
+  <div class="ttl grow">${esc(pageTitle())}</div>
+  ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu">&#9776;</button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
+</div>
+<div class="scrim ${menuOpen ? 'open' : ''}" id="scrim"></div>
+<aside class="drawer ${menuOpen ? 'open' : ''}" id="drawer" aria-label="Menu">
+  <div class="dhead"><b>MH Outlanders</b><div class="note">Recruit Tracker</div></div>
+  ${MENU.map(([k, l, ic]) => `<button class="item ${tab === k ? 'on' : ''}" data-tab="${k}"><span class="ic">${ic}</span>${l}</button>
+    ${k === 'history' ? bs.map((b) => `<button class="item sub ${tab === 'detail' && banner === b ? 'on' : ''}" data-open="${esc(b)}">${esc(b)}</button>`).join('') : ''}`).join('')}
+  <div class="note dfoot">Screenshots are read on this device only. Nothing is uploaded.</div>
+</aside>
+<div class="wrap">${view}</div>`;
   wire();
 }
 
@@ -223,9 +241,10 @@ async function runSync(mode) {
 }
 
 function wire() {
-  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; menuOpen = false; log = ''; render(); }));
-  $('#menu').onclick = (e) => { e.stopPropagation(); menuOpen = !menuOpen; render(); };
-  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; render(); }));
+  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; setMenu(false); log = ''; render(); window.scrollTo(0, 0); }));
+  $('#menu').onclick = () => setMenu(!menuOpen);
+  $('#scrim').onclick = () => setMenu(false);
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; setMenu(false); render(); window.scrollTo(0, 0); }));
   const psel = $('#psel'); if (psel) psel.onchange = () => { period = psel.value; render(); };
   document.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { filter = b.dataset.filter; render(); }));
   const file = $('#file');
@@ -264,7 +283,7 @@ function wire() {
 }
 
 (async () => { state = await loadState(); if (state.pulls.length) tab = 'history'; render(); })();
-document.addEventListener('click', (e) => { if (menuOpen && !e.target.closest('.menuwrap')) { menuOpen = false; render(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen) setMenu(false); });
 // live countdowns: update text in place so inputs/focus are not disturbed
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
