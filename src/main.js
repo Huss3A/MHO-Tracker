@@ -193,7 +193,7 @@ function viewData() {
   <p class="note">${state.pulls.length} pulls stored in this browser (IndexedDB). Nothing is stored on any server.</p></div>
 <div class="card"><h2>Google Drive sync</h2>
   <p class="note">Stores one hidden file (<code>mho-tracker-data.json</code>) in this app's private appData folder of your own Google Drive. The app cannot see any other Drive file. Screenshots are never uploaded.</p>
-  <div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" class="cell" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>
+  ${CONFIG.GOOGLE_CLIENT_ID ? '' : `<div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" class="cell" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>`}
   <div class="row mt"><button class="primary" id="sync" ${cid ? '' : 'disabled'}>Sync now (merge)</button>
     <button id="push" ${cid ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
   ${cid ? '' : '<p class="warn note">No Client ID configured yet - see README "Google Drive setup".</p>'}
