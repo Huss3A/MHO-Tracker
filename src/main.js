@@ -20,7 +20,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null, sbusy = '', slog = '', dlog = '', focusMain = false;
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
-const save = () => saveState(state);
+let saveFailed = false;
+const save = async () => { const ok = await saveState(state); if (ok === saveFailed) { saveFailed = !ok; render(); } return ok; };
 const ALWAYS_SHOWN = ['Featured', 'Rotating', 'Standard'];
 const presentBanners = () => {
   const seen = [...new Set([...ALWAYS_SHOWN, ...state.pulls.map((p) => p.banner)])];   // Beginner etc. appear once they have pulls
@@ -262,12 +263,15 @@ function viewAbout() {
 
 const MENU = [['history', 'Recruit history', '\u{1F4DC}'], ['import', 'Import & data', '\u{1F4E5}'], ['banners', 'Banner schedule', '\u{1F5D3}'], ['about', 'Privacy & about', 'ℹ']];
 const pageTitle = () => (tab === 'detail' ? banner : (MENU.find((m) => m[0] === tab) || MENU[0])[1]);
+// while the drawer is open Tab must not reach the page behind it (the top bar stays reachable for the menu button)
+const applyInert = () => document.querySelectorAll('#main, footer').forEach((e) => { e.inert = menuOpen; });
 function setMenu(open) {
   menuOpen = open;
   $('#drawer')?.classList.toggle('open', open);
   $('#scrim')?.classList.toggle('open', open);
   document.body.style.overflow = open ? 'hidden' : '';
   $('#menu')?.setAttribute('aria-expanded', String(open));
+  applyInert();
   if (open) $('#drawer .item.on, #drawer .item')?.focus();
   else if ($('#drawer')?.contains(document.activeElement)) $('#menu')?.focus();
 }
@@ -290,9 +294,9 @@ function render() {
     ${k === 'history' ? bs.map((b) => `<button class="item sub ${tab === 'detail' && banner === b ? 'on' : ''}" data-open="${esc(b)}"${tab === 'detail' && banner === b ? ' aria-current="page"' : ''}>${esc(b)}</button>`).join('') : ''}`).join('')}
   <div class="note dfoot">Screenshots are read on this device only. Nothing is uploaded.</div>
 </nav>
-<main class="wrap" id="main" tabindex="-1">${view}</main>
+<main class="wrap" id="main" tabindex="-1">${saveFailed ? `<div class="card" role="alert"><b class="warn">Your data could not be saved in this browser.</b><div class="note">Storage looks blocked or full (private browsing?). Use <b>Export JSON</b> on the Import &amp; data page now so you do not lose anything.</div></div>` : ''}${view}</main>
 <footer class="foot"><div class="wrap">&copy; ${new Date().getFullYear()} MH Outlanders Recruit Tracker &middot; Unofficial fan tool, not affiliated with or endorsed by the game's publishers. Game names and trademarks belong to their owners. &middot; <button class="link" data-tab="about">Privacy &amp; about</button></div></footer>`;
-  wire();
+  wire(); applyInert();
   if (focusMain) { focusMain = false; $('#main')?.focus({ preventScroll: true }); }
   if (fk) $(fk)?.focus();   // keep keyboard focus across re-renders (filter pills, selects)
 }
@@ -390,7 +394,7 @@ function wire() {
   };
   on('#wipe', async () => {
     const ok = await confirmDestructive({ title: 'Delete everything on this device?', intro: 'All pulls and settings stored in this browser will be removed. The Drive copy is untouched until you sync or overwrite.', rows: sumHtml('This device', summarisePulls(state.pulls)), risk: null, confirmLabel: 'Delete everything' });
-    if (ok) { state.pulls = []; state.settings = { clientId: '', rules: {} }; save(); dlog = 'Everything on this device was deleted.'; render(); }
+    if (ok) { state.pulls = []; state.settings = { clientId: '', rules: {} }; drive.disconnect(); save(); dlog = 'Everything on this device was deleted.'; render(); }
   });
   on('#savecid', () => { state.settings.clientId = $('#cid').value.trim(); save(); render(); });
   on('#sync', () => runSync('merge'));
@@ -416,5 +420,5 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen
 // live countdowns: update text in place so inputs/focus are not disturbed
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
-window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk, get results() { return results; }, set results(v) { results = v; render(); } };
+if (import.meta.env.DEV) window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk, get results() { return results; }, set results(v) { results = v; render(); } };
 

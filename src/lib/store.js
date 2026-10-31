@@ -32,7 +32,8 @@ export async function saveState(s) {
       tx.objectStore(STORE).put(JSON.parse(JSON.stringify(s)), KEY);
       tx.oncomplete = res; tx.onerror = () => rej(tx.error);
     });
-  } catch { try { localStorage.setItem(DB, JSON.stringify(s)); } catch { /* storage unavailable */ } }
+    return true;
+  } catch { try { localStorage.setItem(DB, JSON.stringify(s)); return true; } catch { return false; /* storage unavailable */ } }
 }
 
 export const exportJson = (s) =>

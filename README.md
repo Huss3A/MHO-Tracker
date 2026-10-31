@@ -60,7 +60,7 @@ private file (`mho-tracker-data.json`) - nothing else in your Drive. A Client ID
 6. **Import & data > Sync now**. First time Google shows the consent screen ("unverified app" is expected in Testing mode).
    Sync *merges* Drive and local data; the two "overwrite" buttons first read the other side (read-only), show both summaries (pulls, newest pull, Drive `savedAt`) in a confirm dialog and warn in red when you would lose pulls (the overwritten side has more pulls or a newer latest pull). Cancel is the default.
 
-> Status: the Drive code path is implemented but **untested against Google** (no client ID existed when it was written).
+> Status: sign-in and sync were tested by the maintainer against a real Google account (Testing mode, test user). Google's access token (about 1 hour, scope `drive.appdata`) is cached in `localStorage` so a page refresh does not disconnect; it is cleared on Disconnect, on expiry, or when Drive answers 401. Export JSON contains pulls only (not the pity-rule overrides or client ID).
 
 ## Banner schedule and 120-pull guarantee
 `src/data/banners.json` lists each banner (name, type, start date, end date, server time UTC+3). A banner runs from the daily reset (05:00 server time, `resetHour` in the JSON) on

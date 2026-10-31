@@ -1,6 +1,8 @@
 /** Decode a File/Blob entirely in the browser into raw RGBA pixels (never uploaded anywhere). */
 export async function loadImage(file) {
+  if (file.size > 40 * 1024 * 1024) throw new Error('Image file is too large (over 40 MB).');
   const bmp = await createImageBitmap(file);
+  if (bmp.width * bmp.height > 50e6) { bmp.close?.(); throw new Error('Image is too large (over 50 megapixels).'); }
   const canvas = document.createElement('canvas');
   canvas.width = bmp.width; canvas.height = bmp.height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
