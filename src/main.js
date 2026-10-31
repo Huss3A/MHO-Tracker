@@ -15,7 +15,6 @@ const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', t
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-const openRates = new Set();
 let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null;
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
@@ -140,8 +139,7 @@ function viewHistory() {
     return `<div class="card bcard">
       <div class="row"><h2 class="grow bname">${esc(b)}</h2><button data-open="${esc(b)}">Open record &rarr;</button></div>
       ${statBox(a2, rl, SCHEDULE.find((x) => x.type === b && stateOf(x, Date.now()) === 'live'), `${esc(b)} banner`)}
-      <details class="rates" data-rates="${esc(b)}" ${openRates.has(b) ? 'open' : ''}><summary>Rates &amp; SSR history</summary>
-        ${sumTable(b, a2.list, b)}${chipsOf(a2.list, rl.ssrPity)}</details>
+      ${sumTable(b, a2.list, b)}${chipsOf(a2.list, rl.ssrPity)}
     </div>`;
   }).join('')}</div>`;
 }
@@ -267,7 +265,6 @@ function wire() {
   document.querySelectorAll('[data-b]').forEach((s) => (s.onchange = () => { results[+s.dataset.b].banner = s.value; }));
   document.querySelectorAll('[data-n]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.n.split(':'); results[+i].rows[+j].name = s.value.trim(); }));
   document.querySelectorAll('[data-r]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.r.split(':'); results[+i].rows[+j].rarity = s.value; }));
-  document.querySelectorAll('[data-rates]').forEach((d) => (d.ontoggle = () => { d.open ? openRates.add(d.dataset.rates) : openRates.delete(d.dataset.rates); }));
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
   on('#clear-res', () => { results = []; render(); });

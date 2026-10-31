@@ -78,6 +78,3 @@ table.sum tr.sub td{font-weight:600;opacity:.85}
 .statbox .sline{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .statbox .n{font-size:26px;line-height:1}.statbox .n.ok{color:var(--ok)}
 .statbox .bar{margin:6px 0 0;height:6px}
-details.rates{margin-top:4px}
-details.rates summary{cursor:pointer;color:var(--mut);padding:8px 2px;list-style:none}
-details.rates summary::before{content:'\25B8  '}details.rates[open] summary::before{content:'\25BE  '}
