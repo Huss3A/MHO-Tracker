@@ -59,9 +59,6 @@ table.sum tr.sub td{font-weight:600;opacity:.85}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px;align-items:start}
 .bname{font-size:18px}
-.pills{margin:10px 0;gap:6px}
-.pillstat{background:var(--panel2);border-radius:12px;padding:8px 12px;font-size:12px;color:var(--mut)}
-.pillstat b{font-size:22px;line-height:1.1}
 
 .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--line)}
 .topbar .ttl{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -75,3 +72,12 @@ table.sum tr.sub td{font-weight:600;opacity:.85}
 .item.on{background:var(--accent);color:#16120a;font-weight:600}
 .item .ic{width:22px;text-align:center}
 .dfoot{margin-top:auto;padding:12px 10px}
+
+.statbox{background:var(--panel2);border-radius:12px;padding:2px 14px;margin-bottom:10px}
+.statbox .sr{padding:10px 0;border-bottom:1px solid var(--line)}.statbox .sr:last-child{border-bottom:0}
+.statbox .sline{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.statbox .n{font-size:26px;line-height:1}.statbox .n.ok{color:var(--ok)}
+.statbox .bar{margin:6px 0 0;height:6px}
+details.rates{margin-top:4px}
+details.rates summary{cursor:pointer;color:var(--mut);padding:8px 2px;list-style:none}
+details.rates summary::before{content:'\25B8  '}details.rates[open] summary::before{content:'\25BE  '}

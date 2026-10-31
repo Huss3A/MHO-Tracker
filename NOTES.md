@@ -33,6 +33,8 @@
 
 - Navigation: sticky top bar (menu button, page title, + Import; back arrow on a banner record) and a slide-in side drawer (history with banner shortcuts, import, banner schedule, data & sync). Closes on item tap, backdrop tap, Esc. Verified by DOM behaviour only (no visual check).
 
+- Banner cards: ONE box (Pulls total, SSR pity, SR pity, +selector on Standard, +120 count on Featured/Rotating), rates table + SSR chips in a collapsible "Rates & SSR history" dropdown (closed by default; open state remembered while the page is open). Record view uses the same box.
+
 ## TODO / ideas
 - Get real samples (other resolution, page 2) and add them to `tests/samples` + a regression script.
 - Banner schedule DONE (`src/data/banners.json`, Banners tab, per-period 120 count). Still open: 50/50 state; confirm Freya's banner type and exact start/end times (daily reset assumed 05:00 UTC+3 per the user; a banner runs from 05:00 on the start date to 05:00 after the end date); confirm Rotating also has the 120 guarantee (user-stated, not in game text).

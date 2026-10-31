@@ -15,6 +15,7 @@ const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', t
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+const openRates = new Set();
 let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null;
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
@@ -76,15 +77,27 @@ ${results.some((r) => r.status !== 'failed') ? `<div class="row"><button class="
 
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
 
-const tile = (title, sub, n, cls = '') => `<div class="tile"><div><div>${title}</div><div class="note">${sub}</div></div><b class="n ${cls}">${n}</b></div>`;
+const srow = (title, sub, n, cls = '', extra = '') => `<div class="sr"><div class="sline"><div><div>${title}</div><div class="note">${sub}</div></div><b class="n ${cls}">${n}</b></div>${extra}</div>`;
 
-/** 120-pull featured guarantee tile for one banner period (every pull in the period counts) */
-function periodTile(b) {
+/** 120-pull featured guarantee row for one banner period (every pull in the period counts) */
+function periodRow(b) {
   const now = Date.now(), st = periodStats(state.pulls, b, state.settings.rules), live = stateOf(b, now) === 'live';
   const sub = st.gotFeatured ? `<span class="ok">${esc(b.name)} obtained at pull ${st.featuredAt}</span>`
     : st.guaranteeReached ? `<span class="warn">${st.limit} reached, no ${esc(b.name)} recorded</span>`
     : `${esc(b.name)} guaranteed at ${st.limit}` + (live ? ` &middot; ends in <span data-countdown="${b.endMs}">${fmtCountdown(b.endMs - now)}</span>` : '');
-  return tile(`${esc(b.name)} banner`, sub, st.count, st.gotFeatured ? 'ok' : 'SSR') + bar(st.count, st.limit);
+  return srow(`${esc(b.name)} banner`, sub, st.count, st.gotFeatured ? 'ok' : 'SSR', bar(st.count, st.limit));
+}
+
+/** the one box: Pulls total, SSR pity, SR pity (+ selector, + 120 per period) */
+function statBox(a, rl, per, totalSub) {
+  const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
+  return `<div class="statbox">
+  ${srow('Pulls total', totalSub, a.total)}
+  ${srow('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR', bar(a.sinceSSR, rl.ssrPity))}
+  ${srow('SR pity', `Guaranteed at ${rl.srPity}`, a.sinceSR, 'SR', bar(a.sinceSR, rl.srPity))}
+  ${rl.selectorAt ? srow('Selector', `Free pick at ${rl.selectorAt} recruits${sel300 ? ` &middot; ${sel300} reached so far` : ''}`, a.total % rl.selectorAt, '', bar(a.total % rl.selectorAt, rl.selectorAt)) : ''}
+  ${rl.featuredPity && per ? periodRow(per) : ''}
+</div>`;
 }
 
 function viewBanners() {
@@ -123,12 +136,12 @@ function viewHistory() {
   const bs = presentBanners();
   if (!bs.length) return `<div class="card">No pulls yet. <button class="primary" data-tab="import">Import screenshots</button></div>`;
   return `<div class="grid">${bs.map((b) => {
-    const a = analyse(state.pulls.filter((p) => p.banner === b), b, state.settings.rules), rl = a.rules;
+    const a2 = analyse(state.pulls.filter((p) => p.banner === b), b, state.settings.rules), rl = a2.rules;
     return `<div class="card bcard">
       <div class="row"><h2 class="grow bname">${esc(b)}</h2><button data-open="${esc(b)}">Open record &rarr;</button></div>
-      <div class="row pills"><span class="pillstat"><b class="SSR">${a.sinceSSR}</b> / ${rl.ssrPity} SSR pity</span><span class="pillstat"><b class="SR">${a.sinceSR}</b> / ${rl.srPity} SR pity</span>
-      ${rl.selectorAt ? `<span class="pillstat"><b>${a.total % rl.selectorAt}</b> / ${rl.selectorAt} selector</span>` : ''}<span class="pillstat">${a.total} pulls</span></div>
-      ${sumTable(b, a.list, b)}${chipsOf(a.list, rl.ssrPity)}
+      ${statBox(a2, rl, SCHEDULE.find((x) => x.type === b && stateOf(x, Date.now()) === 'live'), `${esc(b)} banner`)}
+      <details class="rates" data-rates="${esc(b)}" ${openRates.has(b) ? 'open' : ''}><summary>Rates &amp; SSR history</summary>
+        ${sumTable(b, a2.list, b)}${chipsOf(a2.list, rl.ssrPity)}</details>
     </div>`;
   }).join('')}</div>`;
 }
@@ -148,17 +161,12 @@ function viewDetail() {
   const tag = (p) => { const x = periods.find((b) => pullMs(p.time) >= b.startMs && pullMs(p.time) < b.endMs); return x ? x.name : ''; };
   const col = (v, max) => (v / max < 0.5 ? 'g' : v / max < 0.8 ? 'o' : 'r');
   const rows = view.filter((p) => !filter || p.rarity === filter);
-  const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
   return `
 <div class="card">
   <div class="row"><button data-tab="history">&larr; All banners</button><h2 class="bname" style="margin:0">${esc(banner)}</h2>
     ${periods.length ? `<select id="psel" class="grow"><option value="">All ${esc(banner)} banners</option>${periods.map((x) => `<option value="${x.id}" ${x.id === period ? 'selected' : ''}>${esc(x.name)} &middot; ${esc(x.start)} to ${esc(x.end)}</option>`).join('')}</select>` : ''}</div>
   <div style="height:10px"></div>
-  ${tile('Lifetime pulls', `${esc(banner)} banner${sel ? ` &middot; list shows ${esc(sel.name)}` : ''}`, a.total)}
-  ${tile('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR')}
-  ${tile('SR pity', `Guaranteed at ${rl.srPity}`, a.sinceSR, 'SR')}
-  ${rl.selectorAt ? tile('Selector', `Free pick at ${rl.selectorAt} recruits${sel300 ? ` &middot; ${sel300} reached so far` : ''}`, a.total % rl.selectorAt) + bar(a.total % rl.selectorAt, rl.selectorAt) : ''}
-  ${rl.featuredPity && per ? periodTile(per) : ''}
+  ${statBox(a, rl, per, `${esc(banner)} banner${sel ? ` &middot; list shows ${esc(sel.name)}` : ''}`)}
   <div class="note">${rl.verified ? 'Rules from the game\'s own text.' : '<span class="warn">Unverified rules (assumed).</span>'} ${esc(rl.note || '')}${rl.selectorAt ? ' Selector counter = total recruits mod ' + rl.selectorAt + ' (assumed).' : ''}</div>
 </div>
 <div class="card">
@@ -259,6 +267,7 @@ function wire() {
   document.querySelectorAll('[data-b]').forEach((s) => (s.onchange = () => { results[+s.dataset.b].banner = s.value; }));
   document.querySelectorAll('[data-n]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.n.split(':'); results[+i].rows[+j].name = s.value.trim(); }));
   document.querySelectorAll('[data-r]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.r.split(':'); results[+i].rows[+j].rarity = s.value; }));
+  document.querySelectorAll('[data-rates]').forEach((d) => (d.ontoggle = () => { d.open ? openRates.add(d.dataset.rates) : openRates.delete(d.dataset.rates); }));
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
   on('#clear-res', () => { results = []; render(); });
