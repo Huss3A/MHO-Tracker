@@ -38,14 +38,15 @@ async function processFiles(files) {
     const o = await getOcr();
     for (let i = 0; i < imgs.length; i++) {
       busy = `Reading screenshot ${i + 1}/${imgs.length}: ${imgs[i].name}`; render();
-      try { results.push(await extractScreenshot(imgs[i], o)); }
+      try { const res = await extractScreenshot(imgs[i], o); res.imageUrl = URL.createObjectURL(imgs[i]); res.pageMissing = res.page == null; results.push(res); }
       catch (e) { results.push({ fileName: imgs[i].name, status: 'failed', warnings: ['Error: ' + e.message], rows: [] }); }
     }
   } catch (e) { log = 'Could not start the OCR engine: ' + e.message; }
   busy = ''; render();
 }
 
-const pendingOf = (r) => (r.status === 'failed' ? 0 : r.rows.filter((w) => w.flags.length && !w.ok).length);
+const dropResults = (list) => list.forEach((r) => r.imageUrl && URL.revokeObjectURL(r.imageUrl));
+const pendingOf = (r) => (r.status === 'failed' ? 0 : r.rows.filter((w) => w.flags.length && !w.ok).length + (r.pageMissing && !r.pageOk ? 1 : 0));
 const pendingAll = () => results.reduce((n, r) => n + pendingOf(r), 0);
 
 function commit() {
@@ -55,6 +56,7 @@ function commit() {
   for (const r of results) {
     if (r.status === 'failed' || !r.rows.length || !r.banner) { skipped++; kept.push(r); continue; }
     const res = mergeChunk(state.pulls, r.banner, r.page, r.rows);
+    dropResults([r]);
     state.pulls = res.pulls; added += res.added; conflicts += res.conflicts;
   }
   results = kept;
@@ -77,7 +79,11 @@ ${results.map((r, i) => `
     <span class="badge ${r.status === 'failed' ? 'bad' : pendingOf(r) ? 'warn' : 'ok'}">${r.status === 'failed' ? 'failed' : pendingOf(r) ? `${pendingOf(r)} to confirm` : r.status === 'ok' ? 'confident' : 'all confirmed'}</span></div>
   ${r.status !== 'failed' ? `<div class="row mv">
     <label>Banner <select data-b="${i}">${[...new Set([r.banner, ...BANNER_NAMES, ...LEGACY_NAMES])].map((b) => `<option ${b === r.banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
-    <span class="note">page ${r.page ?? '?'} &middot; ${r.layout?.size} &middot; scale ${r.layout?.scale}</span></div>
+    <label>Page <input type="number" min="1" max="999" class="cell pg ${r.pageMissing && !r.pageOk ? 'warn' : ''}" data-p="${i}" value="${r.page ?? ''}" placeholder="?" aria-label="Page number of this screenshot"></label>
+    ${r.pageMissing ? `<button type="button" class="chk${r.pageOk ? ' on' : ''}" data-pc="${i}" aria-pressed="${!!r.pageOk}" aria-label="${r.pageOk ? 'Page confirmed' : 'Confirm page number'} (the page counter could not be read)" title="${r.pageOk ? 'Page confirmed' : 'The page counter was not readable: enter the page, then confirm'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>` : ''}
+    ${r.imageUrl ? `<button type="button" data-img="${i}" aria-expanded="${!!r.showImg}">${r.showImg ? 'Hide image' : 'Show image'}</button>` : ''}
+    <span class="note">${r.layout?.size} &middot; scale ${r.layout?.scale}</span></div>
+  ${r.showImg && r.imageUrl ? `<img class="shot" src="${r.imageUrl}" alt="Screenshot ${esc(r.fileName)} to compare with the table below">` : ''}
   <div class="scroll"><table><tr><th>#</th><th>Type</th><th>Name</th><th>Rarity</th><th>Time (UTC+3)</th><th>Check</th></tr>
   ${r.rows.map((w, j) => `<tr><td>${w.row + 1}</td><td>${esc(w.type)}</td>
     <td><input class="cell ${w.flags.includes('name') ? 'warn' : ''}" data-n="${i}:${j}" aria-label="Name of row ${w.row + 1}" value="${esc(w.name)}">${w.suggestion ? `<div class="note">OCR: ${esc(w.nameRaw)} &rarr; ${esc(w.suggestion)}?</div>` : ''}</td>
@@ -86,7 +92,7 @@ ${results.map((r, i) => `
     <td class="ck">${w.flags.length ? `<button type="button" class="chk${w.ok ? ' on' : ''}" data-c="${i}:${j}" aria-pressed="${!!w.ok}" aria-label="${w.ok ? 'Confirmed' : 'Confirm'} row ${w.row + 1} (${esc(w.flags.join(', '))} needs checking)" title="${w.ok ? 'Confirmed' : 'Click to confirm this row is correct'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>` : ''}</td></tr>`).join('')}</table></div>` : ''}
   ${r.warnings.length ? `<ul class="warns warn">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 </div>`).join('')}
-${results.some((r) => r.status !== 'failed') ? `<div class="row mb"><button class="primary" id="commit" ${pendingAll() ? 'disabled' : ''}>Add to my table</button><button id="clear-res">Discard</button>${pendingAll() ? `<span class="note warn">Confirm the ${pendingAll()} flagged row(s) with the checkmark first.</span>` : ''}</div>` : ''}
+${results.some((r) => r.status !== 'failed') ? `<div class="row mb"><button class="primary" id="commit" ${pendingAll() ? 'disabled' : ''}>Add to my table</button><button id="clear-res">Discard</button>${pendingAll() ? `<span class="note warn">Confirm the ${pendingAll()} flagged item(s) (rows or page) with the checkmark first.</span>` : ''}</div>` : ''}
 ${viewData()}`;
 
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
@@ -359,10 +365,13 @@ function wire() {
   document.querySelectorAll('[data-b]').forEach((s) => (s.onchange = () => { results[+s.dataset.b].banner = s.value; }));
   document.querySelectorAll('[data-n]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.n.split(':'); results[+i].rows[+j].name = s.value.trim(); }));
   document.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { const [i, j] = b.dataset.c.split(':'); const w = results[+i].rows[+j]; w.ok = !w.ok; render(); }));
+  document.querySelectorAll('[data-p]').forEach((b) => (b.onchange = () => { const n = parseInt(b.value, 10); results[+b.dataset.p].page = n > 0 ? n : null; }));
+  document.querySelectorAll('[data-pc]').forEach((b) => (b.onclick = () => { const r = results[+b.dataset.pc]; r.pageOk = !r.pageOk; render(); }));
+  document.querySelectorAll('[data-img]').forEach((b) => (b.onclick = () => { const r = results[+b.dataset.img]; r.showImg = !r.showImg; render(); }));
   document.querySelectorAll('[data-r]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.r.split(':'); results[+i].rows[+j].rarity = s.value; }));
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
-  on('#clear-res', () => { results = []; render(); });
+  on('#clear-res', () => { dropResults(results); results = []; render(); });
   on('#del-banner', async () => {
     const mine = state.pulls.filter((p) => p.banner === banner), name = banner;
     const ok = await confirmDestructive({ title: `Delete ${name} history?`, intro: `All ${name} pulls will be removed from this device. Pulls of other banners and the Drive copy are not touched until you sync.`, rows: sumHtml(`${name} on this device`, summarisePulls(mine)), risk: null, confirmLabel: `Delete ${name} history` });

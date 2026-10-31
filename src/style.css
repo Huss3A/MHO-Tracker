@@ -120,3 +120,6 @@ button.chk{min-height:0;width:32px;height:32px;padding:0;border-radius:50%;displ
 button.chk svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 button.chk.on{background:var(--ok);border-color:var(--ok);color:var(--on-pill)}
 .tip{border-left:3px solid var(--accent);padding-left:var(--s3)}
+
+input.pg{width:72px;text-align:center}
+img.shot{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:var(--rad);margin:var(--s2) 0}
