@@ -86,7 +86,7 @@ ${viewData()}`;
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
 
 const srow = (title, sub, n, cls = '', extra = '', tip = '') => `<div class="sr"><div class="sline"><div><div>${title}</div><div class="note">${sub}</div></div><span class="nval"><b class="n ${cls}">${n}</b>${tip}</span></div>${extra}</div>`;
-const rateTip = (a) => `<button type="button" class="rtip${a.soft ? ' soft' : ''}" data-tip="Next pull: ${a.nextSSR.toFixed(1)}% SSR${a.soft ? ' (soft pity)' : ''}" aria-label="Next pull SSR chance: ${a.nextSSR.toFixed(1)}%${a.soft ? ', soft pity active' : ''}">&#9650;</button>`;
+const rateTip = (a, rl) => `<button type="button" class="rtip${a.soft ? ' hot' : ''}" style="--p:${Math.min(1, a.sinceSSR / rl.ssrPity).toFixed(2)}" data-tip="Next pull: ${a.nextSSR.toFixed(1)}% SSR${a.soft ? ' (soft pity)' : ''}" aria-label="Next pull SSR chance: ${a.nextSSR.toFixed(1)}%${a.soft ? ', soft pity active' : ''}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 21 19H3z"/></svg></button>`;
 
 /** 120-pull featured guarantee row for one banner period (every pull in the period counts) */
 function periodRow(b) {
@@ -102,7 +102,7 @@ function statBox(a, rl, per, totalSub) {
   const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
   return `<div class="statbox">
   ${srow('Pulls total', totalSub, a.total)}
-  ${srow('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR', bar(a.sinceSSR, rl.ssrPity), a.hasModel ? rateTip(a) : '')}
+  ${srow('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR', bar(a.sinceSSR, rl.ssrPity), a.hasModel ? rateTip(a, rl) : '')}
   ${srow('SR pity', `Guaranteed at ${rl.srPity}`, a.sinceSR, 'SR', bar(a.sinceSR, rl.srPity))}
   ${rl.selectorAt ? srow('Selector', `Free pick at ${rl.selectorAt} recruits${sel300 ? ` &middot; ${sel300} reached so far` : ''}`, a.total % rl.selectorAt, '', bar(a.total % rl.selectorAt, rl.selectorAt)) : ''}
   ${rl.featuredPity && per ? periodRow(per) : ''}
