@@ -62,13 +62,19 @@ export async function extractScreenshot(file, ocr, hooks = {}) {
 
   // page number: tiny single glyph, so vote over several crops/modes; null if no two reads agree
   const votes = {};
-  for (const box of [[1130, 740, 60, 55], [1120, 745, 80, 45]])
-    for (const psm of ['7', '10']) {
-      const t = (await ocr.read(cropForOcr(img, toImg(L, box), 100), { psm, whitelist: '0123456789' })).replace(/\D/g, '');
-      if (t && +t > 0 && +t < 500) votes[t] = (votes[t] || 0) + 1;
-    }
-  const top = Object.entries(votes).sort((x, y) => y[1] - x[1])[0];
-  if (top && top[1] >= 2) out.page = +top[0];
+  const PAGE_BOXES = [[1130, 740, 60, 55], [1120, 745, 80, 45], [1140, 742, 40, 50], [1100, 730, 120, 70]];
+  pageLoop:
+  for (const box of PAGE_BOXES)
+    for (const h of [100, 160])
+      for (const psm of ['7', '8', '10', '13']) {
+        const t = (await ocr.read(cropForOcr(img, toImg(L, box), h), { psm, whitelist: '0123456789' })).replace(/\D/g, '');
+        if (t && +t > 0 && +t < 500) votes[t] = (votes[t] || 0) + 1;
+        if (Object.values(votes).some((n) => n >= 3)) break pageLoop;   // enough agreement
+      }
+  out.pageVotes = votes;
+  const ranked = Object.entries(votes).sort((x, y) => y[1] - x[1]);
+  const top = ranked[0], runnerUp = ranked[1];
+  if (top && top[1] >= 2 && (!runnerUp || top[1] > runnerUp[1])) out.page = +top[0];
   if (out.page == null) out.warnings.push('Page number not readable - rows placed by timestamp only.');
 
   for (let k = 0; k < ROWS_PER_PAGE; k++) {
