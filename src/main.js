@@ -4,7 +4,7 @@ import { mergeChunk, mergePulls, sortDisplay } from './lib/merge.js';
 import { analyse, summarise } from './lib/pity.js';
 import { loadState, saveState, exportJson, parseImport } from './lib/store.js';
 import * as drive from './lib/drive.js';
-import { BANNER_NAMES, BANNERS } from './data/rules.js';
+import { BANNER_NAMES, BANNER_ORDER, BANNERS } from './data/rules.js';
 import { CONFIG } from './config.js';
 import bannersJson from './data/banners.json';
 import { loadSchedule, stateOf, periodStats, fmtCountdown, pullMs, fiftyFifty } from './lib/banners.js';
@@ -19,8 +19,11 @@ let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
 const save = () => saveState(state);
-const presentBanners = () => BANNER_NAMES.filter((b) => state.pulls.some((p) => p.banner === b))
-  .concat([...new Set(state.pulls.map((p) => p.banner))].filter((b) => !BANNER_NAMES.includes(b)));
+const presentBanners = () => {
+  const seen = [...new Set(state.pulls.map((p) => p.banner))];
+  const rank = (b) => (BANNER_ORDER.includes(b) ? BANNER_ORDER.indexOf(b) : BANNER_ORDER.length);
+  return seen.sort((x, y) => rank(x) - rank(y) || x.localeCompare(y));
+};
 
 async function getOcr() { return (ocr ||= await createOcr()); }
 

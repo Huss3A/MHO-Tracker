@@ -12,4 +12,6 @@ export const BANNERS = {
   'Standard Buddy': { ssrPity: 90, srPity: 10, verified: false, note: 'Buddy banners: SSR within 90, SR within every 10 (game text for Buddy Recruitment); assumed to apply here.' },
 };
 export const BANNER_NAMES = Object.keys(BANNERS);
+// display order of banner cards / menu entries: event banners first, permanent ones after
+export const BANNER_ORDER = ['Featured', 'Rotating', 'Festival', 'Limited-Time', 'Targeted', 'Standard', 'Standard Buddy', 'Beginner'];
 export const BASE_RATES = { SSR: 0.6, SR: 9.4, R: 90 };
