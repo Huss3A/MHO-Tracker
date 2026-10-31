@@ -18,6 +18,7 @@ server-side. Never contact or replay anything against game servers** (traffic is
 - `src/lib/merge.js` - position-aware dedupe (identity = ordered rows within a banner+time group; page numbers prove adjacency)
 - `src/lib/pity.js`, `src/data/rules.js` (per-banner rules, `verified` flag), `store.js` (IndexedDB), `drive.js` (GIS + Drive REST)
 - `src/data/banners.json` + `src/lib/banners.js` - banner schedule (edit JSON when new banners are announced), period lookup, per-period 120-pull count, countdowns
+- `src/lib/overwrite.js` (pure overwrite-risk compare), `dialog.js` (accessible confirm modal), `scripts/check-contrast.mjs`, `COMPLIANCE.md`
 - `src/main.js` UI (vanilla, template strings); `src/config.js` OAuth client ID (`VITE_GOOGLE_CLIENT_ID`)
 
 ## Gotchas

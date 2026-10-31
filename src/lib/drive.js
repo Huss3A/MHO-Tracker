@@ -2,6 +2,7 @@
 // (scope drive.appdata: the app can see ONLY its own hidden file, nothing else in the user's Drive).
 // The OAuth Client ID is public config (not a secret); see README for how to create one.
 import { mergePulls } from './merge.js';
+import { summarisePulls } from './overwrite.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE = 'mho-tracker-data.json';
@@ -60,7 +61,19 @@ async function upload(id, pulls) {
   return api('/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + b }, body: multi });
 }
 
-/** mode: 'merge' (default) | 'push' (overwrite Drive with local) | 'pull' (overwrite local with Drive) */
+/**
+ * Read-only look at the Drive copy (nothing is written): {exists, count, newest, savedAt, modifiedTime}.
+ * Call connect() first. Used by the overwrite confirmation dialog.
+ */
+export async function peek() {
+  const f = await findFile();
+  if (!f) return { exists: false, count: 0, newest: null, savedAt: null, modifiedTime: null };
+  const d = await download(f.id), pulls = d.pulls || [];
+  return { exists: true, ...summarisePulls(pulls), savedAt: d.savedAt || null, modifiedTime: f.modifiedTime || null };
+}
+
+/** Runs only after the user confirmed (overwrite modes) - see confirmDialog in main.js.
+ * mode: 'merge' (default) | 'push' (overwrite Drive with local) | 'pull' (overwrite local with Drive) */
 export async function sync(localPulls, mode = 'merge') {
   const f = await findFile();
   const remote = f ? (await download(f.id)).pulls || [] : [];

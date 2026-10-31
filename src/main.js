@@ -2,9 +2,11 @@ import './style.css';
 import { createOcr, extractScreenshot } from './lib/ocr.js';
 import { mergeChunk, mergePulls } from './lib/merge.js';
 import { analyse, summarise } from './lib/pity.js';
+import { confirmDialog } from './lib/dialog.js';
+import { summarisePulls, overwriteRisk } from './lib/overwrite.js';
 import { loadState, saveState, exportJson, parseImport } from './lib/store.js';
 import * as drive from './lib/drive.js';
-import { BANNER_NAMES, BANNER_ORDER, BANNERS } from './data/rules.js';
+import { BANNER_NAMES, LEGACY_NAMES, BANNER_ORDER, BANNERS } from './data/rules.js';
 import { CONFIG } from './config.js';
 import bannersJson from './data/banners.json';
 import { loadSchedule, stateOf, periodStats, fmtCountdown, pullMs, fiftyFifty } from './lib/banners.js';
@@ -15,7 +17,7 @@ const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', t
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null;
+let state, tab = 'import', menuOpen = false, filter = 'SSR', period = '', banner = null, results = [], busy = '', log = '', ocr = null, sbusy = '', slog = '', dlog = '', focusMain = false;
 
 const clientId = () => state.settings.clientId || CONFIG.GOOGLE_CLIENT_ID;
 const save = () => saveState(state);
@@ -52,12 +54,12 @@ function commit() {
     state.pulls = res.pulls; added += res.added; conflicts += res.conflicts;
   }
   results = kept;
-  log = `Added ${added} new pull(s).` + (conflicts ? ` ${conflicts} group(s) overlapped inconsistently - check the History tab.` : '') + (skipped ? ` ${skipped} screenshot(s) skipped (failed).` : '');
+  log = `Added ${added} new pull(s).` + (conflicts ? ` ${conflicts} group(s) overlapped inconsistently - check the Recruit history page.` : '') + (skipped ? ` ${skipped} screenshot(s) skipped (failed).` : '');
   save(); banner = banner || presentBanners()[0]; tab = added ? 'history' : tab; render();
 }
 
 const viewImport = () => `
-<div class="card">
+<div class="card"><h2>Import screenshots</h2>
   <div class="drop" id="drop"><b>Drop screenshots here</b> or <button id="pick">choose files</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
     <div class="note mt">Game: Recruit &gt; Overview &gt; Recruitment History. One screenshot per table page; several at once is fine.<br>
@@ -69,7 +71,7 @@ ${results.map((r, i) => `
   <div class="row"><b class="grow">${esc(r.fileName)}</b>
     <span class="badge ${r.status === 'ok' ? 'ok' : r.status === 'review' ? 'warn' : 'bad'}">${r.status === 'ok' ? 'confident' : r.status === 'review' ? 'please review' : 'failed'}</span></div>
   ${r.status !== 'failed' ? `<div class="row mv">
-    <label>Banner <select data-b="${i}">${[...new Set([r.banner, ...BANNER_NAMES])].map((b) => `<option ${b === r.banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
+    <label>Banner <select data-b="${i}">${[...new Set([r.banner, ...BANNER_NAMES, ...LEGACY_NAMES])].map((b) => `<option ${b === r.banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
     <span class="note">page ${r.page ?? '?'} &middot; ${r.layout?.size} &middot; scale ${r.layout?.scale}</span></div>
   <div class="scroll"><table><tr><th>#</th><th>Type</th><th>Name</th><th>Rarity</th><th>Time (UTC+3)</th></tr>
   ${r.rows.map((w, j) => `<tr><td>${w.row + 1}</td><td>${esc(w.type)}</td>
@@ -78,7 +80,8 @@ ${results.map((r, i) => `
     <td>${esc(w.time)}</td></tr>`).join('')}</table></div>` : ''}
   ${r.warnings.length ? `<ul class="warns warn">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 </div>`).join('')}
-${results.some((r) => r.status !== 'failed') ? `<div class="row"><button class="primary" id="commit">Add to my table</button><button id="clear-res">Discard</button></div>` : ''}`;
+${results.some((r) => r.status !== 'failed') ? `<div class="row mb"><button class="primary" id="commit">Add to my table</button><button id="clear-res">Discard</button></div>` : ''}
+${viewData()}`;
 
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
 
@@ -98,7 +101,7 @@ function statBox(a, rl, per, totalSub) {
   const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
   return `<div class="statbox">
   ${srow('Pulls total', totalSub, a.total)}
-  ${srow('SSR pity', `Guaranteed at ${rl.ssrPity}`, a.sinceSSR, 'SSR', bar(a.sinceSSR, rl.ssrPity))}
+  ${srow('SSR pity', `Guaranteed at ${rl.ssrPity}` + (a.hasModel ? ` &middot; Next pull: <b>${a.nextSSR.toFixed(1)}%</b> SSR${a.soft ? ' <span class="soft">Soft pity</span>' : ''}` : ''), a.sinceSSR, 'SSR', bar(a.sinceSSR, rl.ssrPity))}
   ${srow('SR pity', `Guaranteed at ${rl.srPity}`, a.sinceSR, 'SR', bar(a.sinceSR, rl.srPity))}
   ${rl.selectorAt ? srow('Selector', `Free pick at ${rl.selectorAt} recruits${sel300 ? ` &middot; ${sel300} reached so far` : ''}`, a.total % rl.selectorAt, '', bar(a.total % rl.selectorAt, rl.selectorAt)) : ''}
   ${rl.featuredPity && per ? periodRow(per) : ''}
@@ -174,7 +177,7 @@ function viewDetail() {
 <div class="card">
   ${sumTable(banner, view, banner)}
   ${chipsOf(view, rl.ssrPity)}
-  <div class="note mt">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.</div>
+  <div class="note mt">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.${a.hasModel ? ` Soft pity: from pull ${rl.softPityStart} without an SSR the chance rises by ${rl.softPityStep} points per pull, 100% at pull ${rl.ssrPity} (rate model taken from the gacha.gg calculator, not confirmed by game text).` : ''}</div>
 </div>
 <div class="card">
   <div class="row mb">${[['SSR', 'SSR'], ['SR', 'SR'], ['R', 'R'], ['', 'All']].map(([k, l]) => `<button data-filter="${k}" class="pill ${k} ${filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -187,24 +190,63 @@ function viewDetail() {
 function viewData() {
   const cid = clientId();
   return `
-<div class="card"><h2>Local data</h2>
-  <div class="row"><button id="export">Export JSON</button><button id="import">Import JSON</button><input id="jsonfile" type="file" accept=".json,application/json" hidden>
-  <button class="danger" id="wipe">Delete everything</button></div>
-  <p class="note">${state.pulls.length} pulls stored in this browser (IndexedDB). Nothing is stored on any server.</p></div>
+<div class="card"><h2>Backup: export / import JSON</h2>
+  <div class="row"><button id="export">Export JSON</button><button id="jsonimport">Import JSON</button><input id="jsonfile" type="file" accept=".json,application/json" aria-label="JSON file to import" hidden></div>
+  <p class="note">${state.pulls.length} pulls stored in this browser (IndexedDB). Nothing is stored on any server. Importing merges, it never removes pulls.</p>
+  ${dlog ? `<p class="log" role="status">${esc(dlog)}</p>` : ''}</div>
 <div class="card"><h2>Google Drive sync</h2>
-  <p class="note">Stores one hidden file (<code>mho-tracker-data.json</code>) in this app's private appData folder of your own Google Drive. The app cannot see any other Drive file. Screenshots are never uploaded.</p>
+  <p class="note">Stores one hidden file (<code>mho-tracker-data.json</code>) in this app's private appData folder of your own Google Drive. The app cannot see any other Drive file. Screenshots are never uploaded. The Google sign-in script only loads when you press a button below.</p>
   ${CONFIG.GOOGLE_CLIENT_ID ? '' : `<div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" class="cell" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>`}
-  <div class="row mt"><button class="primary" id="sync" ${cid ? '' : 'disabled'}>Sync now (merge)</button>
-    <button id="push" ${cid ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
+  <div class="row mt"><button class="primary" id="sync" ${cid && !sbusy ? '' : 'disabled'}>Sync now (merge)</button></div>
+  <p class="note mt">Merge combines both sides and loses nothing. The two buttons below replace one side completely and ask you to confirm first:</p>
+  <div class="row"><button id="push" ${cid && !sbusy ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid && !sbusy ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
   ${cid ? '' : '<p class="warn note">No Client ID configured yet - see README "Google Drive setup".</p>'}
-  ${busy ? `<p class="log">${esc(busy)}</p>` : ''}${log ? `<p class="log">${esc(log)}</p>` : ''}</div>
+  <div role="status">${sbusy ? `<p class="log">${esc(sbusy)}</p>` : ''}${slog ? `<p class="log">${esc(slog)}</p>` : ''}</div></div>
 <div class="card"><h2>Pity rules</h2><div class="scroll"><table><tr><th>Banner</th><th>SSR pity</th><th>SR pity</th><th>Source</th></tr>
 ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[b] || {}) }; return `<tr><td>${b}</td>
 <td><input class="cell narrow" aria-label="${b} SSR pity" inputmode="numeric" data-rule="${b}:ssrPity" value="${r.ssrPity}"></td><td><input class="cell narrow" aria-label="${b} SR pity" inputmode="numeric" data-rule="${b}:srPity" value="${r.srPity}"></td>
-<td class="${BANNERS[b].verified ? 'ok' : 'warn'}">${BANNERS[b].verified ? 'game text' : 'assumed'}</td></tr>`; }).join('')}</table></div></div>`;
+<td class="${BANNERS[b].verified ? 'ok' : 'warn'}">${BANNERS[b].source}</td></tr>`; }).join('')}</table></div>
+  <p class="note mt">Soft pity (rising SSR chance) is modelled for Featured, Rotating and Standard; see Recruit history &rarr; a banner.</p></div>
+<div class="card"><h2>Delete everything</h2>
+  <p class="note">Removes all ${state.pulls.length} pulls and settings stored in this browser. The Drive copy is untouched until you sync or overwrite.</p>
+  <button class="danger" id="wipe">Delete everything</button></div>`;
 }
 
-const MENU = [['history', 'Recruit history', '\u{1F4DC}'], ['import', 'Import screenshots', '\u{1F4E5}'], ['banners', 'Banner schedule', '\u{1F5D3}'], ['data', 'Data & sync', '☁']];
+function viewAbout() {
+  const y = new Date().getFullYear();
+  return `
+<div class="card"><h2>About</h2>
+  <p>MH Outlanders Recruit Tracker is a free, unofficial fan tool. It reads your own Recruitment History screenshots on your device and shows your pity counters and statistics. It has no server, no accounts and no tracking.</p>
+  <p class="note">Source and issue tracker: a public repository link will be added here when the project is published.</p></div>
+<div class="card" id="privacy"><h2>Privacy policy</h2>
+  <p><b>Short version:</b> we do not collect your data. There is no server that receives it.</p>
+  <ul class="plain">
+    <li><b>Screenshots</b> are read by an OCR engine running inside your browser and are never uploaded. They are not stored either; only the recognised rows are.</li>
+    <li><b>Your pulls and settings</b> are stored in this browser (IndexedDB, with localStorage as a fallback). This is strictly functional storage that the app needs to work. The site sets no cookies and has no analytics, advertising or tracking.</li>
+    <li><b>Optional Google Drive sync:</b> if you press a Drive button, the Google sign-in script (accounts.google.com) is loaded and you sign in with Google. The app asks only for the <code>drive.appdata</code> permission and saves one file, <code>mho-tracker-data.json</code>, in its own hidden app data folder in <em>your</em> Drive. It cannot see or change any other file. Google processes that traffic under its own privacy policy. Nothing goes to any server of ours. Before you press a Drive button no request is made to Google.</li>
+    <li><b>Fonts and OCR files</b> are served by the same site (self-hosted); no third-party font or script is loaded on page load.</li>
+    <li><b>Hosting:</b> the static files come from the site's host (GitHub Pages), which may keep ordinary server logs such as your IP address under its own policy. This app cannot see them.</li>
+  </ul>
+  <h3>Deleting your data</h3>
+  <ul class="plain">
+    <li>On this device: <button class="link" data-tab="import">Import &amp; data</button> &rarr; <b>Delete everything</b>, or clear this site's data in your browser settings. Use <b>Export JSON</b> first if you want a copy.</li>
+    <li>Drive copy: Google Drive &rarr; Settings &rarr; Manage apps &rarr; this app &rarr; <i>Delete hidden app data</i>, and/or remove the app's access at <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a> (the Disconnect button below also revokes the current session token). Since we hold no copy of your data and have no accounts, there is nothing else to erase on our side.</li>
+  </ul>
+  <button id="disconnect">Disconnect Google</button> <span class="note" role="status">${drive.isConnected() ? 'A Google session is active.' : 'No Google session in this tab.'}</span></div>
+<div class="card"><h2>Terms and disclaimer</h2>
+  <p>This tool is provided as is, without warranty of any kind. Counters and statistics come from OCR and from rules that are partly assumed (the app marks which); they can be wrong. You are responsible for your own data and backups; export it regularly. The tool is unofficial and is not affiliated with, endorsed by or sponsored by the publishers or developers of Monster Hunter Outlanders. Use it at your own risk and in line with the game's own terms.</p></div>
+<div class="card"><h2>Copyright, trademarks and open source</h2>
+  <p>&copy; ${y} the maintainers of this project. Monster Hunter, Monster Hunter Outlanders, and all related names, logos and artwork are trademarks or copyrights of their respective owners and are used here only to identify the game. No game assets are included.</p>
+  <ul class="plain"><li><a href="https://github.com/naptha/tesseract.js" rel="noopener noreferrer" target="_blank">tesseract.js</a> (Apache-2.0) and the Tesseract OCR engine and trained data (Apache-2.0), run in your browser.</li>
+  <li>Didact Gothic font (SIL Open Font License 1.1), self-hosted.</li>
+  <li>Built with Vite (MIT).</li></ul></div>
+<div class="card"><h2>Accessibility statement</h2>
+  <p>We aim to meet WCAG 2.2 level AA. Checked so far: keyboard-only operation of all views and dialogs, visible focus, page landmarks and a skip link, labelled icon buttons, colour contrast in the light and dark themes (computed from the stylesheet colours), reduced-motion support, and no horizontal scrolling at 375 px width.</p>
+  <p><b>Known limitations:</b> not tested with a range of screen readers; the screenshot drop area needs a pointer, but the "choose files" button does the same by keyboard; progress bars are visual (the numbers beside them carry the same information); times use the game's server time (UTC+3).</p>
+  <p><b>Feedback:</b> please report problems through the project's issue tracker. The public contact method will be added here when the repository is published.</p></div>`;
+}
+
+const MENU = [['history', 'Recruit history', '\u{1F4DC}'], ['import', 'Import & data', '\u{1F4E5}'], ['banners', 'Banner schedule', '\u{1F5D3}'], ['about', 'Privacy & about', 'ℹ']];
 const pageTitle = () => (tab === 'detail' ? banner : (MENU.find((m) => m[0] === tab) || MENU[0])[1]);
 function setMenu(open) {
   menuOpen = open;
@@ -217,14 +259,16 @@ function setMenu(open) {
 }
 function render() {
   const fa = document.activeElement, fk = fa && fa !== document.body ? (fa.id ? '#' + fa.id : fa.dataset?.filter != null ? `[data-filter="${fa.dataset.filter}"]` : '') : '';
-  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'detail' ? viewDetail() : tab === 'banners' ? viewBanners() : viewData();
+  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'detail' ? viewDetail() : tab === 'banners' ? viewBanners() : viewAbout();
   const bs = presentBanners();
+  document.title = `${pageTitle()} - MH Outlanders Recruit Tracker`;
   $('#app').innerHTML = `
-<div class="topbar">
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
   ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button>` : `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>`}
   <h1 class="ttl grow">${esc(pageTitle())}</h1>
   ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
-</div>
+</header>
 <div class="scrim ${menuOpen ? 'open' : ''}" id="scrim"></div>
 <nav class="drawer ${menuOpen ? 'open' : ''}" id="drawer" aria-label="Menu">
   <div class="dhead"><b>MH Outlanders</b><div class="note">Recruit Tracker</div></div>
@@ -232,8 +276,10 @@ function render() {
     ${k === 'history' ? bs.map((b) => `<button class="item sub ${tab === 'detail' && banner === b ? 'on' : ''}" data-open="${esc(b)}"${tab === 'detail' && banner === b ? ' aria-current="page"' : ''}>${esc(b)}</button>`).join('') : ''}`).join('')}
   <div class="note dfoot">Screenshots are read on this device only. Nothing is uploaded.</div>
 </nav>
-<div class="wrap">${view}</div>`;
+<main class="wrap" id="main" tabindex="-1">${view}</main>
+<footer class="foot"><div class="wrap">&copy; ${new Date().getFullYear()} MH Outlanders Recruit Tracker &middot; Unofficial fan tool, not affiliated with or endorsed by the game's publishers. Game names and trademarks belong to their owners. &middot; <button class="link" data-tab="about">Privacy &amp; about</button></div></footer>`;
   wire();
+  if (focusMain) { focusMain = false; $('#main')?.focus({ preventScroll: true }); }
   if (fk) $(fk)?.focus();   // keep keyboard focus across re-renders (filter pills, selects)
 }
 
@@ -243,23 +289,54 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+const dt = (iso) => (iso ? new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'unknown');
+const sumHtml = (label, sm, extra = '') => `<li><b>${label}:</b> ${sm.count} pull(s), latest pull ${esc(sm.newest || 'none')} (UTC+3)${extra}</li>`;
+
+/** Confirm a destructive step. `rows` = summary list items, `risk` = overwriteRisk() result or null. */
+function confirmDestructive({ title, intro, rows, risk, confirmLabel }) {
+  const danger = !!(risk && risk.risk);
+  return confirmDialog({
+    title: esc(title), confirmLabel, danger: true,
+    warning: danger ? `Warning: the data about to be overwritten ${risk.reasons.map(esc).join(' and ')} than what replaces it. You would lose information.` : '',
+    html: `<p>${intro}</p><ul class="plain">${rows}</ul><p class="note">This cannot be undone. Cancel keeps everything as it is.</p>`,
+  });
+}
+
 async function runSync(mode) {
+  if (sbusy) return;
+  const fail = (e) => { slog = 'Sync failed: ' + e.message; sbusy = ''; render(); };
   try {
-    busy = 'Signing in to Google...'; render();
+    sbusy = 'Signing in to Google...'; slog = ''; render();
     await drive.connect(clientId());
-    busy = 'Syncing...'; render();
+    if (mode !== 'merge') {
+      sbusy = 'Reading the Drive copy (nothing is changed yet)...'; render();
+      const remote = await drive.peek();
+      sbusy = ''; render();
+      const local = summarisePulls(state.pulls), push = mode === 'push';
+      if (!push && !remote.exists) { slog = 'There is no Drive copy yet, so there is nothing to copy to this device.'; render(); return; }
+      const risk = push ? overwriteRisk(local, remote.exists ? remote : null) : overwriteRisk(remote, local);
+      const driveExtra = remote.exists ? `, last saved ${esc(dt(remote.savedAt || remote.modifiedTime))}` : ' (no file yet)';
+      const ok = await confirmDestructive({
+        title: push ? 'Overwrite Drive with this device?' : 'Overwrite this device with Drive?',
+        intro: push ? 'The Drive copy will be <b>replaced</b> by the data stored on this device.' : 'The data stored on this device will be <b>replaced</b> by the Drive copy.',
+        rows: sumHtml('Drive', remote, driveExtra) + sumHtml('This device', local),
+        risk, confirmLabel: push ? 'Overwrite Drive' : 'Overwrite this device',
+      });
+      if (!ok) { slog = 'Cancelled. Nothing was changed.'; render(); return; }
+    }
+    sbusy = 'Syncing...'; render();
     const res = await drive.sync(state.pulls, mode);
     if (mode !== 'push') { state.pulls = res.pulls; await save(); }
-    log = `Done. Drive had ${res.remoteCount}, this device had ${res.localCount}, now ${res.pulls.length} pulls.`;
-  } catch (e) { log = 'Sync failed: ' + e.message; }
-  busy = ''; render();
+    slog = `Done. Drive had ${res.remoteCount}, this device had ${res.localCount}, now ${res.pulls.length} pulls.`;
+  } catch (e) { return fail(e); }
+  sbusy = ''; render();
 }
 
 function wire() {
-  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; setMenu(false); log = ''; render(); window.scrollTo(0, 0); }));
+  document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; setMenu(false); log = ''; focusMain = true; render(); window.scrollTo(0, 0); }));
   $('#menu').onclick = () => setMenu(!menuOpen);
   $('#scrim').onclick = () => setMenu(false);
-  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; setMenu(false); render(); window.scrollTo(0, 0); }));
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; setMenu(false); focusMain = true; render(); window.scrollTo(0, 0); }));
   const psel = $('#psel'); if (psel) psel.onchange = () => { period = psel.value; render(); };
   document.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { filter = b.dataset.filter; render(); }));
   const file = $('#file');
@@ -277,20 +354,28 @@ function wire() {
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
   on('#clear-res', () => { results = []; render(); });
-  on('#del-banner', () => { if (confirm(`Delete all ${banner} history from this device?`)) { state.pulls = state.pulls.filter((p) => p.banner !== banner); save(); tab = 'history'; render(); window.scrollTo(0, 0); } });
+  on('#del-banner', async () => {
+    const mine = state.pulls.filter((p) => p.banner === banner), name = banner;
+    const ok = await confirmDestructive({ title: `Delete ${name} history?`, intro: `All ${name} pulls will be removed from this device. Pulls of other banners and the Drive copy are not touched until you sync.`, rows: sumHtml(`${name} on this device`, summarisePulls(mine)), risk: null, confirmLabel: `Delete ${name} history` });
+    if (ok) { state.pulls = state.pulls.filter((p) => p.banner !== name); save(); tab = 'history'; render(); window.scrollTo(0, 0); }
+  });
   on('#export', () => download('mho-recruit-history.json', exportJson(state)));
-  on('#import', () => $('#jsonfile').click());
+  on('#jsonimport', () => $('#jsonfile').click());
   const jf = $('#jsonfile');
   if (jf) jf.onchange = async () => {
-    try { const add = parseImport(await jf.files[0].text()); jf.value = ''; const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); log = `Imported. ${state.pulls.length - n} new pull(s).`; }
-    catch (e) { log = 'Import failed: ' + e.message; }
+    try { const add = parseImport(await jf.files[0].text()); jf.value = ''; const n = state.pulls.length; state.pulls = mergePulls(state.pulls, add); await save(); dlog = `Imported. ${state.pulls.length - n} new pull(s).`; }
+    catch (e) { dlog = 'Import failed: ' + e.message; }
     render();
   };
-  on('#wipe', () => { if (confirm('Delete ALL local data? (Drive copy is untouched until you sync/overwrite.)')) { state.pulls = []; save(); render(); } });
+  on('#wipe', async () => {
+    const ok = await confirmDestructive({ title: 'Delete everything on this device?', intro: 'All pulls and settings stored in this browser will be removed. The Drive copy is untouched until you sync or overwrite.', rows: sumHtml('This device', summarisePulls(state.pulls)), risk: null, confirmLabel: 'Delete everything' });
+    if (ok) { state.pulls = []; save(); dlog = 'Everything on this device was deleted.'; render(); }
+  });
   on('#savecid', () => { state.settings.clientId = $('#cid').value.trim(); save(); render(); });
   on('#sync', () => runSync('merge'));
-  on('#push', () => confirm('Replace the Drive copy with this device\'s data?') && runSync('push'));
-  on('#pull', () => confirm('Replace this device\'s data with the Drive copy?') && runSync('pull'));
+  on('#push', () => runSync('push'));
+  on('#pull', () => runSync('pull'));
+  on('#disconnect', () => { drive.disconnect(); render(); });
   document.querySelectorAll('[data-rule]').forEach((i) => (i.onchange = () => {
     const [b, k] = i.dataset.rule.split(':'); const v = parseInt(i.value, 10);
     if (v > 0) { (state.settings.rules[b] ||= {})[k] = v; save(); } else render();   // invalid -> restore the stored value

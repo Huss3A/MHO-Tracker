@@ -1,8 +1,21 @@
-import { BANNERS, BASE_RATES } from '../data/rules.js';
+import { BANNERS, BASE_RATES, GENERIC_RULES } from '../data/rules.js';
 import { sortDisplay } from './merge.js';
 
 export const rulesFor = (banner, overrides = {}) =>
-  ({ ...(BANNERS[banner] || { ssrPity: 90, srPity: 10, verified: false }), ...(overrides[banner] || {}) });
+  ({ ...(BANNERS[banner] || GENERIC_RULES), ...(overrides[banner] || {}) });
+
+/**
+ * Chance (percent, 0-100) that the pull with 1-based number `n` since the last SSR is an SSR.
+ * Base rate, plus `softPityStep` points per pull from `softPityStart` on (that pull included),
+ * and 100 at the hard pity. Banners without softPityStart (Beginner, unsupported) stay flat.
+ */
+export function ssrRate(n, rules) {
+  if (n >= rules.ssrPity) return 100;
+  const base = rules.baseSSR ?? BASE_RATES.SSR;
+  if (!rules.softPityStart || n < rules.softPityStart) return base;
+  return Math.min(100, base + (n - rules.softPityStart + 1) * rules.softPityStep);
+}
+export const inSoftPity = (n, rules) => !!rules.softPityStart && n >= rules.softPityStart && n < rules.ssrPity;
 
 /**
  * Walk the pulls of one banner oldest -> newest. Display order is newest-first, so chronological
@@ -26,6 +39,7 @@ export function analyse(pulls, banner, overrides) {
   return {
     rules, total, cnt, list: list.reverse(),
     sinceSSR, sinceSR,
+    nextSSR: ssrRate(sinceSSR + 1, rules), soft: inSoftPity(sinceSSR + 1, rules), hasModel: !!rules.softPityStart,
     ssrLeft: Math.max(0, rules.ssrPity - sinceSSR), srLeft: Math.max(0, rules.srPity - sinceSR),
     avgSSRPity: ssr.length ? ssr.reduce((a, p) => a + p.pity, 0) / ssr.length : null,
     rate: (r) => (total ? (cnt[r] / total) * 100 : 0),

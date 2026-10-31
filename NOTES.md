@@ -15,7 +15,8 @@
 - Standard: SSR within 90, SR every 10; two SSR Buddies in a row -> next SSR is an Adventurer; free pick after 300.
 - Featured: SSR within 90 (carries across Featured), 50% featured else next SSR featured, featured within 120 per period.
 - Beginner: SSR Adventurer within 50 (max 50 recruits), SR every 10. Buddy banners: SSR 90, SR 10.
-- Rates SSR 0.6 / SR 9.4 / R 90. Rotating/Festival/Limited-Time/Targeted/Standard Buddy: **assumed** 90/10.
+- Rates SSR 0.6 / SR 9.4 / R 90. Rotating 90/10 confirmed by the maintainer's own testing. Festival/Limited-Time/Targeted/Standard Buddy were removed from the menu/rules (stored pulls kept, generic 90/10).
+- Soft pity model (unverified by game text): from gacha.gg's calculator data - base 0.6%, +4.27 pts per pull from the 73rd pull, 90th = 100%. The requester expected 75; the calculator says 73 (`softPityStart` in `src/data/rules.js`).
 - Record table: last 6 months or 1000 recruits, times in server time UTC+3.
 
 ## Assumptions to confirm with the user
@@ -24,7 +25,7 @@
 3. SSR also resets the SR counter.
 
 ## UI (paimon.moe-style)
-- Hamburger menu: Recruit history / Import / Banner schedule / Data & sync. History is the default once pulls exist.
+- Hamburger menu: Recruit history / Import & data (one page) / Banner schedule / Privacy & about. History is the default once pulls exist.
 - History: banner dropdown + banner-period dropdown (e.g. Midori), tiles (lifetime, SSR/SR pity, Standard 300 selector, 120 per period), rarity table with type split, SSR chips, filterable record list.
 - Standard 300 selector counter = total recruits mod 300 (ASSUMED; how the game resets it is unknown). Not yet visually checked (pane screenshots time out); only DOM text verified.
 
@@ -35,7 +36,14 @@
 
 - Banner cards: ONE box (Pulls total, SSR pity, SR pity, +selector on Standard, +120 count on Featured/Rotating) with the rates table + SSR chips directly below it (no dropdown). Record view uses the same box.
 
+## Not tested against live services
+- Drive overwrite confirm flow (peek + dialog + push/pull) is unit-tested only for the pure comparison (`overwriteRisk`); the real sign-in/Drive calls were not exercised.
+
+## Compliance
+See `COMPLIANCE.md` (checklist applicability, CSP, contrast results). Contrast: `node scripts/check-contrast.mjs -v` (part of `npm test`).
+
 ## TODO / ideas
+- Add the public repo URL / contact method to the Privacy & about page and COMPLIANCE.md once the repo is public.
 - Get real samples (other resolution, page 2) and add them to `tests/samples` + a regression script.
 - Banner schedule DONE (`src/data/banners.json`, Banners tab, per-period 120 count). Still open: 50/50 state; confirm Freya's banner type and exact start/end times (daily reset assumed 05:00 UTC+3 per the user; a banner runs from 05:00 on the start date to 05:00 after the end date); confirm Rotating also has the 120 guarantee (user-stated, not in game text).
 - Standard banner: "two SSR Buddies in a row" and 300-pull pick indicators.

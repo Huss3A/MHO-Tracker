@@ -1,7 +1,8 @@
 // Node tests for the position-aware merge + pity logic (npm test)
 import assert from 'node:assert/strict';
 import { mergeChunk, mergePulls } from '../src/lib/merge.js';
-import { analyse } from '../src/lib/pity.js';
+import { summarisePulls, overwriteRisk } from '../src/lib/overwrite.js';
+import { analyse, ssrRate, inSoftPity, rulesFor } from '../src/lib/pity.js';
 import { loadSchedule, periodFor, periodStats, fiftyFifty, stateOf, pullMs, fmtCountdown } from '../src/lib/banners.js';
 
 const T = '2026/10/29 05:38:11';
@@ -67,4 +68,24 @@ const ff = [['2026/11/01 00:00:04', 'Other'], ['2026/11/01 00:00:03', 'Midori'],
 const w = fiftyFifty(ff, sch, 'Featured');
 assert.equal(w.wins, 1); assert.equal(w.losses, 2);
 assert.equal(fiftyFifty(ff, sch, 'Standard'), null);
+// soft-pity rate model (gacha.gg calculator: base 0.6, ramp from 73, +4.27/pull, hard 90)
+const fr = rulesFor('Featured'), near = (x, y) => assert.ok(Math.abs(x - y) < 1e-9, `${x} != ${y}`);
+near(ssrRate(1, fr), 0.6); near(ssrRate(72, fr), 0.6); near(ssrRate(73, fr), 4.87); near(ssrRate(74, fr), 9.14);
+near(ssrRate(75, fr), 13.41); near(ssrRate(76, fr), 17.68); near(ssrRate(89, fr), 73.19); assert.equal(ssrRate(90, fr), 100);
+assert.equal(inSoftPity(72, fr), false); assert.equal(inSoftPity(73, fr), true); assert.equal(inSoftPity(90, fr), false);
+assert.equal(ssrRate(30, rulesFor('Beginner')), 0.6); assert.equal(ssrRate(50, rulesFor('Beginner')), 100);
+assert.equal(rulesFor('Festival').ssrPity, 90, 'unsupported banner names fall back to generic rules');
+assert.equal(rulesFor('Rotating').verified, true);
+assert.equal(analyse([], 'Featured').nextSSR, 0.6);
+// overwrite safety (pure): losing info = dest has more pulls or a newer latest pull
+const A = { count: 380, newest: '2026/10/30 10:00:00' }, B = { count: 412, newest: '2026/10/31 12:00:00' };
+assert.deepEqual(summarisePulls([{ time: '2026/01/02 00:00:00' }, { time: '2026/03/01 00:00:00' }, {}]), { count: 3, newest: '2026/03/01 00:00:00' });
+assert.deepEqual(summarisePulls([]), { count: 0, newest: null });
+assert.equal(overwriteRisk(A, B).risk, true, 'replacing a bigger/newer set with a smaller one loses data');
+assert.equal(overwriteRisk(A, B).reasons.length, 2);
+assert.equal(overwriteRisk(B, A).risk, false, 'replacing a smaller/older set with a bigger one is safe');
+assert.equal(overwriteRisk(A, { count: 100, newest: '2026/11/01 00:00:00' }).risk, true, 'newer latest pull alone is a risk');
+assert.equal(overwriteRisk({ count: 5, newest: '2026/01/01 00:00:00' }, { count: 9, newest: '2025/01/01 00:00:00' }).reasons.length, 1, 'more pulls alone');
+assert.equal(overwriteRisk(A, null).risk, false, 'no destination file');
+assert.equal(overwriteRisk({ count: 0, newest: null }, B).risk, true, 'overwriting with empty data');
 console.log('all merge/pity tests passed');

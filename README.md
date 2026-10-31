@@ -14,11 +14,12 @@ The game's network traffic is encrypted (per-session key), so there is no URL/AP
 from. OCR of the in-game table is the practical route.
 
 ## Use
-1. Open the app, go to **Import**, drop one or more screenshots (one per table page).
+1. Open the app, go to **Import & data**, drop one or more screenshots (one per table page).
 2. Check anything flagged *please review* (unknown banner, low-confidence name/rarity, unreadable row);
    fix it in the preview table, then **Add to my table**.
-3. **History & pity** shows per-banner list, pity bars, rates vs base rates. **Data & sync** has JSON
-   export/import and Drive sync.
+3. **Recruit history** shows per-banner list, pity bars, the SSR chance of your next pull (soft pity marked), rates vs base rates.
+   **Import & data** is one page: screenshot import, JSON export/import, Drive sync, pity rules, delete everything.
+   **Privacy & about** has the privacy policy, terms, attribution and accessibility statement.
 
 Re-uploading the same screenshot is safe: rows are merged by *position within a (banner, time) group*,
 so genuine duplicates (two "Horn" in one 10-pull) are kept while overlapping screenshots are not
@@ -54,10 +55,10 @@ private file (`mho-tracker-data.json`) - nothing else in your Drive. A Client ID
    - **Authorized JavaScript origins**: `https://<user>.github.io` (no path, no trailing slash) and, for local testing, `http://localhost:5173`.
    - No redirect URI is needed (token flow).
 5. Copy the Client ID (`1234-abc.apps.googleusercontent.com`) and either
-   - paste it in the app under **Data & sync > OAuth Client ID** (stored in your browser only), or
+   - paste it in the app under **Import & data > Google Drive sync > OAuth Client ID** (stored in your browser only), or
    - bake it in: set `VITE_GOOGLE_CLIENT_ID` when building (`VITE_GOOGLE_CLIENT_ID=... npm run build`), or edit `src/config.js`.
-6. **Data & sync > Sync now**. First time Google shows the consent screen ("unverified app" is expected in Testing mode).
-   Sync *merges* Drive and local data; there are also explicit "overwrite" buttons.
+6. **Import & data > Sync now**. First time Google shows the consent screen ("unverified app" is expected in Testing mode).
+   Sync *merges* Drive and local data; the two "overwrite" buttons first read the other side (read-only), show both summaries (pulls, newest pull, Drive `savedAt`) in a confirm dialog and warn in red when you would lose pulls (the overwritten side has more pulls or a newer latest pull). Cancel is the default.
 
 > Status: the Drive code path is implemented but **untested against Google** (no client ID existed when it was written).
 
@@ -75,10 +76,13 @@ the pull results. To add a banner, append an entry to the JSON and rebuild (`npm
 | Beginner | 50 | every 10 | max 50 recruits |
 | Standard | 90 | every 10 | two SSR Buddies in a row -> next SSR is an Adventurer; free pick after 300 |
 | Featured | 90 (carries over) | every 10 | 50% featured, else next SSR is featured; featured guaranteed within 120 per banner period |
-| Rotating, Festival, Limited-Time, Targeted, Standard Buddy | **assumed 90** | **assumed 10** | not verified; editable in Data & sync |
+| Rotating | 90 | every 10 | confirmed by the maintainer's own testing; 120-pull featured guarantee per banner period |
 
-Base rates: SSR 0.6%, SR 9.4%, R 90%. The 120-pull featured guarantee is not tracked (the table does not say which
-SSR was the featured one).
+Festival, Limited-Time, Targeted and Standard Buddy are no longer offered in the menu or the rules list. Existing pulls under those names are kept and still show as a card (generic 90/10, no soft pity); the OCR still recognises the names.
+
+**Soft pity** (Featured, Rotating, Standard): base SSR 0.6%; from the 73rd pull without an SSR every pull adds 4.27 percentage points; the 90th is always an SSR. This is the model used by the gacha.gg summon calculator (not confirmed by game text; the calculator uses 73, not 75). The stat box shows "Next pull: x%" and a Soft pity tag. Beginner stays flat 0.6% up to its 50-pull guarantee.
+
+Base rates: SSR 0.6%, SR 9.4%, R 90%. The 120-pull featured guarantee is tracked per banner period from `src/data/banners.json`.
 
 ## Assumptions to verify
 - **Rarity from name colour**: gold = SSR, purple = SR, blue = R (from the game's `<Legendary>SSR` / `<Epic>SR` tags;
