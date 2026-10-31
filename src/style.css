@@ -114,3 +114,9 @@ button.rtip::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(
 button.rtip:hover::after,button.rtip:focus-visible::after,button.rtip:focus::after{opacity:1}
 
 kbd{font:inherit;font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--panel2)}
+
+td.ck,th:last-child.ck{text-align:center;width:56px}
+button.chk{min-height:0;width:32px;height:32px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--warn);border-color:var(--warn);background:transparent}
+button.chk svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+button.chk.on{background:var(--ok);border-color:var(--ok);color:var(--on-pill)}
+.tip{border-left:3px solid var(--accent);padding-left:var(--s3)}

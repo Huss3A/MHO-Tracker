@@ -6,7 +6,15 @@ import { summarisePulls } from './overwrite.js';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE = 'mho-tracker-data.json';
+// The access token (valid ~1 hour, scope drive.appdata only) is kept in localStorage until it expires, so a page
+// refresh does not drop the connection. It is cleared on Disconnect, on expiry, or when Drive answers 401.
+const KEY = 'mho-drive-token';
 let token = null, tokenExp = 0;
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved?.token && saved.exp > Date.now() + 60000) { token = saved.token; tokenExp = saved.exp; } else localStorage.removeItem(KEY);
+} catch { /* storage unavailable: connection just lasts for this page load */ }
+function remember() { try { token ? localStorage.setItem(KEY, JSON.stringify({ token, exp: tokenExp })) : localStorage.removeItem(KEY); } catch { /* ignore */ } }
 
 function loadGis() {
   if (window.google?.accounts?.oauth2) return Promise.resolve();
@@ -27,7 +35,7 @@ export async function connect(clientId) {
       client_id: clientId, scope: SCOPE,
       callback: (r) => {
         if (r.error) return reject(new Error(r.error_description || r.error));
-        token = r.access_token; tokenExp = Date.now() + (r.expires_in || 3600) * 1000; resolve(token);
+        token = r.access_token; tokenExp = Date.now() + (r.expires_in || 3600) * 1000; remember(); resolve(token);
       },
       error_callback: (e) => reject(new Error(e.type || 'Sign-in cancelled')),
     });
@@ -35,13 +43,16 @@ export async function connect(clientId) {
   });
 }
 export const isConnected = () => !!token && Date.now() < tokenExp;
-export function disconnect() {
-  if (token) window.google?.accounts.oauth2.revoke(token, () => {});
-  token = null;
+export async function disconnect() {
+  const t = token;
+  token = null; tokenExp = 0; remember();
+  if (!t) return;
+  try { await loadGis(); window.google.accounts.oauth2.revoke(t, () => {}); } catch { /* offline: the token still expires on its own */ }
 }
 
 async function api(path, opts = {}) {
   const r = await fetch('https://www.googleapis.com' + path, { ...opts, headers: { Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+  if (r.status === 401) { token = null; tokenExp = 0; remember(); }
   if (!r.ok) throw new Error(`Drive API ${r.status}: ${(await r.text()).slice(0, 200)}`);
   return r;
 }

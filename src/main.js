@@ -45,7 +45,11 @@ async function processFiles(files) {
   busy = ''; render();
 }
 
+const pendingOf = (r) => (r.status === 'failed' ? 0 : r.rows.filter((w) => w.flags.length && !w.ok).length);
+const pendingAll = () => results.reduce((n, r) => n + pendingOf(r), 0);
+
 function commit() {
+  if (pendingAll()) return;
   let added = 0, conflicts = 0, skipped = 0;
   const kept = [];
   for (const r of results) {
@@ -63,24 +67,26 @@ const viewImport = () => `
   <div class="drop" id="drop"><b>Drop screenshots here</b>, paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <button id="pick">choose files</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
     <div class="note mt">Game: Recruit &gt; Overview &gt; Recruitment History. One screenshot per table page; several at once is fine.<br>
-    Images are read on this device only - they are never uploaded anywhere.</div></div>
+    Images are read on this device only - they are never uploaded anywhere.</div>
+    <div class="note mt tip"><b>Tip:</b> to move screenshots faster, mirror your phone or tablet screen to your computer and capture it with your computer's screenshot tool (for example <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd>), then paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>.</div></div>
   ${busy ? `<p class="log">${esc(busy)}</p>` : ''}${log ? `<p class="log ok">${esc(log)}</p>` : ''}
 </div>
 ${results.map((r, i) => `
 <div class="card">
   <div class="row"><b class="grow">${esc(r.fileName)}</b>
-    <span class="badge ${r.status === 'ok' ? 'ok' : r.status === 'review' ? 'warn' : 'bad'}">${r.status === 'ok' ? 'confident' : r.status === 'review' ? 'please review' : 'failed'}</span></div>
+    <span class="badge ${r.status === 'failed' ? 'bad' : pendingOf(r) ? 'warn' : 'ok'}">${r.status === 'failed' ? 'failed' : pendingOf(r) ? `${pendingOf(r)} to confirm` : r.status === 'ok' ? 'confident' : 'all confirmed'}</span></div>
   ${r.status !== 'failed' ? `<div class="row mv">
     <label>Banner <select data-b="${i}">${[...new Set([r.banner, ...BANNER_NAMES, ...LEGACY_NAMES])].map((b) => `<option ${b === r.banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></label>
     <span class="note">page ${r.page ?? '?'} &middot; ${r.layout?.size} &middot; scale ${r.layout?.scale}</span></div>
-  <div class="scroll"><table><tr><th>#</th><th>Type</th><th>Name</th><th>Rarity</th><th>Time (UTC+3)</th></tr>
+  <div class="scroll"><table><tr><th>#</th><th>Type</th><th>Name</th><th>Rarity</th><th>Time (UTC+3)</th><th>Check</th></tr>
   ${r.rows.map((w, j) => `<tr><td>${w.row + 1}</td><td>${esc(w.type)}</td>
     <td><input class="cell ${w.flags.includes('name') ? 'warn' : ''}" data-n="${i}:${j}" aria-label="Name of row ${w.row + 1}" value="${esc(w.name)}">${w.suggestion ? `<div class="note">OCR: ${esc(w.nameRaw)} &rarr; ${esc(w.suggestion)}?</div>` : ''}</td>
     <td><select data-r="${i}:${j}" aria-label="Rarity of row ${w.row + 1}">${['SSR', 'SR', 'R'].map((x) => `<option ${x === w.rarity ? 'selected' : ''}>${x}</option>`).join('')}</select>${w.flags.includes('rarity') ? ' <span class="warn">?</span>' : ''}</td>
-    <td>${esc(w.time)}</td></tr>`).join('')}</table></div>` : ''}
+    <td>${esc(w.time)}</td>
+    <td class="ck">${w.flags.length ? `<button type="button" class="chk${w.ok ? ' on' : ''}" data-c="${i}:${j}" aria-pressed="${!!w.ok}" aria-label="${w.ok ? 'Confirmed' : 'Confirm'} row ${w.row + 1} (${esc(w.flags.join(', '))} needs checking)" title="${w.ok ? 'Confirmed' : 'Click to confirm this row is correct'}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>` : ''}</td></tr>`).join('')}</table></div>` : ''}
   ${r.warnings.length ? `<ul class="warns warn">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
 </div>`).join('')}
-${results.some((r) => r.status !== 'failed') ? `<div class="row mb"><button class="primary" id="commit">Add to my table</button><button id="clear-res">Discard</button></div>` : ''}
+${results.some((r) => r.status !== 'failed') ? `<div class="row mb"><button class="primary" id="commit" ${pendingAll() ? 'disabled' : ''}>Add to my table</button><button id="clear-res">Discard</button>${pendingAll() ? `<span class="note warn">Confirm the ${pendingAll()} flagged row(s) with the checkmark first.</span>` : ''}</div>` : ''}
 ${viewData()}`;
 
 const bar = (v, max) => `<div class="bar"><i style="width:${Math.min(100, (v / max) * 100)}%"></i></div>`;
@@ -223,6 +229,7 @@ function viewAbout() {
   <p><b>Short version:</b> we do not collect your data. There is no server that receives it.</p>
   <ul class="plain">
     <li><b>Screenshots</b> are read by an OCR engine running inside your browser and are never uploaded. They are not stored either; only the recognised rows are.</li>
+    <li><b>Google Drive session:</b> after you connect Drive, Google's temporary access token (valid about one hour, limited to this app's hidden Drive file) is kept in this browser's localStorage so a page refresh does not disconnect you. It is removed when you press Disconnect Google or when it expires.</li>
     <li><b>Your pulls and settings</b> are stored in this browser (IndexedDB, with localStorage as a fallback). This is strictly functional storage that the app needs to work. The site sets no cookies and has no analytics, advertising or tracking.</li>
     <li><b>Optional Google Drive sync:</b> if you press a Drive button, the Google sign-in script (accounts.google.com) is loaded and you sign in with Google. The app asks only for the <code>drive.appdata</code> permission and saves one file, <code>mho-tracker-data.json</code>, in its own hidden app data folder in <em>your</em> Drive. It cannot see or change any other file. Google processes that traffic under its own privacy policy. Nothing goes to any server of ours. Before you press a Drive button no request is made to Google.</li>
     <li><b>Fonts and OCR files</b> are served by the same site (self-hosted); no third-party font or script is loaded on page load.</li>
@@ -233,7 +240,7 @@ function viewAbout() {
     <li>On this device: <button class="link" data-tab="import">Import &amp; data</button> &rarr; <b>Delete everything</b>, or clear this site's data in your browser settings. Use <b>Export JSON</b> first if you want a copy.</li>
     <li>Drive copy: Google Drive &rarr; Settings &rarr; Manage apps &rarr; this app &rarr; <i>Delete hidden app data</i>, and/or remove the app's access at <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer" target="_blank">myaccount.google.com/permissions</a> (the Disconnect button below also revokes the current session token). Since we hold no copy of your data and have no accounts, there is nothing else to erase on our side.</li>
   </ul>
-  <button id="disconnect">Disconnect Google</button> <span class="note" role="status">${drive.isConnected() ? 'A Google session is active.' : 'No Google session in this tab.'}</span></div>
+  <button id="disconnect">Disconnect Google</button> <span class="note" role="status">${drive.isConnected() ? 'A Google session is active.' : 'Not connected (or the 1-hour Google session expired).'}</span></div>
 <div class="card"><h2>Terms and disclaimer</h2>
   <p>This tool is provided as is, without warranty of any kind. Counters and statistics come from OCR and from rules that are partly assumed (the app marks which); they can be wrong. You are responsible for your own data and backups; export it regularly. The tool is unofficial and is not affiliated with, endorsed by or sponsored by the publishers or developers of Monster Hunter Outlanders. Use it at your own risk and in line with the game's own terms.</p></div>
 <div class="card"><h2>Copyright, trademarks and open source</h2>
@@ -351,6 +358,7 @@ function wire() {
   }
   document.querySelectorAll('[data-b]').forEach((s) => (s.onchange = () => { results[+s.dataset.b].banner = s.value; }));
   document.querySelectorAll('[data-n]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.n.split(':'); results[+i].rows[+j].name = s.value.trim(); }));
+  document.querySelectorAll('[data-c]').forEach((b) => (b.onclick = () => { const [i, j] = b.dataset.c.split(':'); const w = results[+i].rows[+j]; w.ok = !w.ok; render(); }));
   document.querySelectorAll('[data-r]').forEach((s) => (s.onchange = () => { const [i, j] = s.dataset.r.split(':'); results[+i].rows[+j].rarity = s.value; }));
   const on = (id, fn) => { const e = $(id); if (e) e.onclick = fn; };
   on('#commit', commit);
@@ -396,5 +404,5 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen
 // live countdowns: update text in place so inputs/focus are not disturbed
 setInterval(() => document.querySelectorAll('[data-countdown]').forEach((e) => { e.textContent = fmtCountdown(+e.dataset.countdown - Date.now()); }), 1000);
 // test hook (used by the in-browser verification, harmless otherwise)
-window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk };
+window.__mho = { extract: async (f) => extractScreenshot(f, await getOcr()), get state() { return state; }, mergeChunk, get results() { return results; }, set results(v) { results = v; render(); } };
 
