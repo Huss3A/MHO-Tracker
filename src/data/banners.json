@@ -4,6 +4,6 @@
   "banners": [
     { "id": "midori-2026-10", "name": "Midori", "type": "Featured", "start": "2026-10-29", "end": "2026-11-26", "confirmed": true },
     { "id": "rhodes-2026-10", "name": "Rhodes", "type": "Rotating", "start": "2026-10-29", "end": "2026-11-26", "confirmed": true },
-    { "id": "freya-2026-11", "name": "Freya", "type": null, "start": "2026-11-27", "end": "2027-01-21", "confirmed": true }
+    { "id": "freya-2026-11", "name": "Freya", "type": "Featured", "start": "2026-11-27", "end": "2027-01-21", "confirmed": true }
   ]
 }
