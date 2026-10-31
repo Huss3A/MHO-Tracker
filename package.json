@@ -11,7 +11,7 @@
     "prebuild": "npm run prepare-assets",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node scripts/test-merge.mjs"
+    "test": "node scripts/test-merge.mjs && node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "tesseract.js": "^7.0.0"
