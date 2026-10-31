@@ -24,11 +24,22 @@ export function meanTextColour(img, x0, y0, x1, y1) {
   return [r / top.length, g / top.length, b / top.length];
 }
 
+// Hue (degrees) of the glyph colour. Judging by hue instead of RGB distance keeps it stable when a screenshot
+// is stretched/upscaled (which boosts saturation and shifts brightness) or colour-managed differently.
+export const RARITY_HUE = { SSR: 42, R: 205, SR: 265 };
+export function hueOf([r, g, b]) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (!d) return 0;
+  const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+
 export function classifyRarity(c) {
   if (!c) return { rarity: null, dist: Infinity, ok: false };
-  const ranked = Object.entries(RARITY_REF)
-    .map(([k, v]) => [k, Math.hypot(c[0] - v[0], c[1] - v[1], c[2] - v[2])])
-    .sort((a, b) => a[1] - b[1]);
+  const h = hueOf(c);
+  const ranked = Object.entries(RARITY_HUE).map(([k, v]) => [k, hueGap(h, v)]).sort((a, b) => a[1] - b[1]);
   const [best, second] = ranked;
-  return { rarity: best[0], dist: best[1], ok: best[1] < 45 && second[1] - best[1] > 15 };
+  // dist = hue gap to the closest rarity colour (degrees); classes are 60+ degrees apart
+  return { rarity: best[0], dist: best[1], ok: best[1] < 28 && second[1] - best[1] > 20 };
 }

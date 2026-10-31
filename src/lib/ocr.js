@@ -86,12 +86,13 @@ export async function extractScreenshot(file, ocr, hooks = {}) {
     const ty = snapType(typeRaw);
     const nm = snapName(nameRaw, ty.ok ? ty.type : undefined);
     const colBox = toImg(L, [REF_COLS.name[0], cy - 20, REF_COLS.name[1] - REF_COLS.name[0], 40]);
-    const rar = classifyRarity(meanTextColour(img, colBox.x, colBox.y, colBox.x + colBox.w, colBox.y + colBox.h));
+    const colour = meanTextColour(img, colBox.x, colBox.y, colBox.x + colBox.w, colBox.y + colBox.h);
+    const rar = classifyRarity(colour);
     const flags = [];
     if (!ty.ok) flags.push('type');
     if (!nm.ok) flags.push('name');
     if (!rar.ok) flags.push('rarity');
-    out.rows.push({ row: k, type: ty.type, name: nm.name, nameRaw, source: snapBanner(sourceRaw).banner, rarity: rar.rarity || 'R', time, flags, suggestion: nm.suggestion });
+    out.rows.push({ row: k, type: ty.type, name: nm.name, nameRaw, source: snapBanner(sourceRaw).banner, rarity: rar.rarity || 'R', colour: colour && colour.map(Math.round), rdist: Math.round(rar.dist), time, flags, suggestion: nm.suggestion });
     if (flags.length) { out.status = 'review'; out.warnings.push(`Row ${k + 1} (${nm.name || nameRaw}): check ${flags.join(', ')}.`); }
     hooks.progress?.();
   }

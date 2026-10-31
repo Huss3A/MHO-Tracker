@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mergeChunk, mergePulls } from '../src/lib/merge.js';
 import { summarisePulls, overwriteRisk } from '../src/lib/overwrite.js';
 import { analyse, ssrRate, inSoftPity, rulesFor } from '../src/lib/pity.js';
+import { classifyRarity } from '../src/lib/rarity.js';
 import { loadSchedule, periodFor, periodStats, fiftyFifty, stateOf, pullMs, fmtCountdown } from '../src/lib/banners.js';
 
 const T = '2026/10/29 05:38:11';
@@ -88,4 +89,9 @@ assert.equal(overwriteRisk(A, { count: 100, newest: '2026/11/01 00:00:00' }).ris
 assert.equal(overwriteRisk({ count: 5, newest: '2026/01/01 00:00:00' }, { count: 9, newest: '2025/01/01 00:00:00' }).reasons.length, 1, 'more pulls alone');
 assert.equal(overwriteRisk(A, null).risk, false, 'no destination file');
 assert.equal(overwriteRisk({ count: 0, newest: null }, B).risk, true, 'overwriting with empty data');
+// rarity by hue: measured colours from 2000x923 (native) and upscaled/stretched screenshots must all be confident
+for (const [want, cols] of Object.entries({ R: [[114, 157, 189], [96, 151, 192], [106, 156, 193]], SR: [[132, 108, 179], [124, 81, 192], [131, 102, 188]], SSR: [[194, 162, 94]] }))
+  for (const c of cols) { const r = classifyRarity(c); assert.equal(r.rarity, want, `rarity ${c}`); assert.equal(r.ok, true, `rarity confident ${c}`); }
+assert.equal(classifyRarity([200, 200, 200]).ok, false, 'grey is not confident');
+assert.equal(classifyRarity(null).ok, false);
 console.log('all merge/pity tests passed');
