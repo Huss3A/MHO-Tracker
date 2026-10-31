@@ -108,7 +108,7 @@ button.danger-solid{background:var(--bad-solid);color:#fff;border-color:var(--ba
 
 .nval{display:inline-flex;align-items:center;gap:6px;position:relative}
 button.rtip{--sz:calc(24px + 14px * var(--p,0));min-height:0;width:var(--sz);height:var(--sz);padding:0;border-radius:50%;color:var(--SSR);border-color:var(--SSR);position:relative;display:inline-flex;align-items:center;justify-content:center;transition:width .2s,height .2s}
-button.rtip svg{width:50%;height:50%;fill:currentColor;display:block;transform:translateY(-4%)}
+button.rtip svg{width:56%;height:56%;fill:currentColor;display:block;margin:0}
 button.rtip.hot{background:color-mix(in srgb,var(--SSR) 22%,transparent)}
 button.rtip::after{content:attr(data-tip);position:absolute;right:0;bottom:calc(100% + 6px);white-space:nowrap;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:var(--rad);padding:4px 8px;font-size:12px;font-weight:400;box-shadow:0 4px 14px #0005;opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
 button.rtip:hover::after,button.rtip:focus-visible::after,button.rtip:focus::after{opacity:1}
