@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MHO Tracker logo">
+  <title>MHO Tracker</title>
+  <defs>
+    <!-- one diagonal arm of the X, drawn pointing up: kite with a nested cut-out and a solid core -->
+    <g id="arm" fill="#000">
+      <path fill-rule="evenodd" d="M256 20 L322 108 L256 200 L190 108 Z M256 52 L296 108 L256 166 L216 108 Z"/>
+      <path d="M256 82 L276 108 L256 136 L236 108 Z"/>
+    </g>
+  </defs>
+
+  <!-- the X: four arms on the diagonals -->
+  <use href="#arm" transform="rotate(45 256 256)"/>
+  <use href="#arm" transform="rotate(135 256 256)"/>
+  <use href="#arm" transform="rotate(225 256 256)"/>
+  <use href="#arm" transform="rotate(315 256 256)"/>
+
+  <!-- centre: eight-point star with a hollow core -->
+  <g fill="#000">
+    <path d="M256 190 L322 256 L256 322 L190 256 Z"/>
+    <path d="M212 212 H300 V300 H212 Z"/>
+  </g>
+  <path fill="#fff" d="M256 230 L282 256 L256 282 L230 256 Z"/>
+  <path fill="#000" d="M256 243 L269 256 L256 269 L243 256 Z"/>
+
+  <!-- the four sides of the X: left = M, top = H, right = O, bottom = T -->
+  <g fill="none" stroke="#000" stroke-width="16" stroke-linejoin="miter" stroke-linecap="butt">
+    <path d="M74 288 V224 L100 262 L126 224 V288"/>
+    <path d="M230 62 V122 M282 62 V122 M230 92 H282"/>
+    <circle cx="412" cy="256" r="26"/>
+    <path d="M228 390 H284 M256 390 V450"/>
+  </g>
+</svg>

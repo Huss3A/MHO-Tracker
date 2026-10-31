@@ -231,7 +231,7 @@ function viewAbout() {
   return `
 <div class="card"><h2>About</h2>
   <p>MH Outlanders Recruit Tracker is a free, unofficial fan tool. It reads your own Recruitment History screenshots on your device and shows your pity counters and statistics. It has no server, no accounts and no tracking.</p>
-  <p class="note">Source and issue tracker: a public repository link will be added here when the project is published.</p></div>
+  <p class="note">Source code and issue tracker: <a href="https://github.com/Huss3A/MHO-Tracker" rel="noopener noreferrer" target="_blank">github.com/Huss3A/MHO-Tracker</a>. Standalone pages: <a href="privacy.html">Privacy policy</a> and <a href="terms.html">Terms of service</a>.</p></div>
 <div class="card" id="privacy"><h2>Privacy policy</h2>
   <p><b>Short version:</b> we do not collect your data. There is no server that receives it.</p>
   <ul class="plain">
@@ -295,7 +295,7 @@ function render() {
   <div class="note dfoot">Screenshots are read on this device only. Nothing is uploaded.</div>
 </nav>
 <main class="wrap" id="main" tabindex="-1">${saveFailed ? `<div class="card" role="alert"><b class="warn">Your data could not be saved in this browser.</b><div class="note">Storage looks blocked or full (private browsing?). Use <b>Export JSON</b> on the Import &amp; data page now so you do not lose anything.</div></div>` : ''}${view}</main>
-<footer class="foot"><div class="wrap">&copy; ${new Date().getFullYear()} MH Outlanders Recruit Tracker &middot; Unofficial fan tool, not affiliated with or endorsed by the game's publishers. Game names and trademarks belong to their owners. &middot; <button class="link" data-tab="about">Privacy &amp; about</button></div></footer>`;
+<footer class="foot"><div class="wrap">&copy; ${new Date().getFullYear()} MH Outlanders Recruit Tracker &middot; Unofficial fan tool, not affiliated with or endorsed by the game's publishers. Game names and trademarks belong to their owners. &middot; <button class="link" data-tab="about">Privacy &amp; about</button> &middot; <a href="privacy.html">Privacy policy</a> &middot; <a href="terms.html">Terms</a></div></footer>`;
   wire(); applyInert();
   if (focusMain) { focusMain = false; $('#main')?.focus({ preventScroll: true }); }
   if (fk) $(fk)?.focus();   // keep keyboard focus across re-renders (filter pills, selects)

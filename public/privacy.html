@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<title>Privacy Policy - MHO Tracker</title>
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+<nav class="top" aria-label="Site"><a href="./">&larr; MHO Tracker</a><a href="terms.html">Terms of service</a></nav>
+<h1>Privacy Policy</h1>
+<p class="mut">MHO Tracker (MH Outlanders Recruit Tracker), an unofficial fan tool. Last updated: 31 October 2026.</p>
+
+<p><b>Short version:</b> we do not collect your data. The app has no server and no accounts. Everything you import stays in your own browser, and only if you choose to connect Google Drive does a copy go to your own Drive.</p>
+
+<h2>What the app handles</h2>
+<ul>
+<li><b>Screenshots</b> of the game's Recruitment History that you choose, drop or paste. They are read by an OCR engine running inside your browser and are never uploaded. They are not stored; only the recognised rows (type, name, rarity, time, banner, page) are kept.</li>
+<li><b>Your pull history and settings</b> are stored in your browser (IndexedDB, with localStorage as a fallback). This is strictly functional storage. The site sets no cookies and has no analytics, advertising or tracking.</li>
+</ul>
+
+<h2>Google user data (optional Google Drive sync)</h2>
+<p>If, and only if, you press a Google Drive button in the app, the app loads Google's sign-in script and asks you to sign in with Google.</p>
+<ul>
+<li><b>What we access:</b> only the permission <code>https://www.googleapis.com/auth/drive.appdata</code> (the app's own hidden "application data" folder). The app cannot see, list, read or change any other file in your Drive. We do not receive your name, email address or any other profile information.</li>
+<li><b>What we do with it:</b> the app reads and writes a single file, <code>mho-tracker-data.json</code>, containing your pull history, so you can back it up and move it between your devices. That is the only purpose.</li>
+<li><b>Where it goes:</b> directly between your browser and Google. The data is not sent to us or to any other third party, because we operate no server.</li>
+<li><b>Access token:</b> after you sign in, Google gives the page a temporary access token (valid about one hour). It is kept in this browser's localStorage so a page refresh does not disconnect you, and removed when you press <b>Disconnect Google</b> or when it expires.</li>
+<li><b>Retention:</b> the Drive file stays in your own Drive until you delete it.</li>
+</ul>
+<p>The use and transfer of information received from Google APIs by this app adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Third parties</h2>
+<ul>
+<li><b>Google</b> processes sign-in and Drive traffic under its own privacy policy, only after you press a Drive button. Before that no request is made to Google.</li>
+<li><b>Fonts and OCR files</b> are served by this same site; no third-party font, script or tracker is loaded when the page opens.</li>
+<li><b>Hosting:</b> the static files come from GitHub Pages, which may keep ordinary server logs (such as your IP address) under GitHub's own policy. This app cannot see them.</li>
+</ul>
+
+<h2>Deleting your data</h2>
+<ul>
+<li><b>On your device:</b> open the app, go to Import &amp; data and press <b>Delete everything</b>, or clear this site's data in your browser settings. Use <b>Export JSON</b> first if you want a copy.</li>
+<li><b>In Google Drive:</b> open Google Drive &rarr; Settings &rarr; Manage apps &rarr; this app &rarr; <i>Delete hidden app data</i>, and/or remove the app's access at <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">myaccount.google.com/permissions</a>.</li>
+<li>We hold no copy of your data and have no accounts, so there is nothing else to erase on our side.</li>
+</ul>
+
+<h2>Children</h2>
+<p>The app is not directed at children and collects no personal information from anyone.</p>
+
+<h2>Changes and contact</h2>
+<p>If this policy changes, the new version and date will appear on this page. Questions or requests: please open an issue at <a href="https://github.com/Huss3A/MHO-Tracker/issues" rel="noopener noreferrer">github.com/Huss3A/MHO-Tracker/issues</a>.</p>
+</main>
+</body>
+</html>
