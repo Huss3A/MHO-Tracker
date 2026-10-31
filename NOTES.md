@@ -35,7 +35,7 @@
 
 ## TODO / ideas
 - Get real samples (other resolution, page 2) and add them to `tests/samples` + a regression script.
-- Banner schedule DONE (`src/data/banners.json`, Banners tab, per-period 120 count). Still open: 50/50 state; confirm Freya's banner type and exact start/end times (dates assumed 00:00 start, end of end-date, UTC+3); confirm Rotating also has the 120 guarantee (user-stated, not in game text).
+- Banner schedule DONE (`src/data/banners.json`, Banners tab, per-period 120 count). Still open: 50/50 state; confirm Freya's banner type and exact start/end times (daily reset assumed 05:00 UTC+3 per the user; a banner runs from 05:00 on the start date to 05:00 after the end date); confirm Rotating also has the 120 guarantee (user-stated, not in game text).
 - Standard banner: "two SSR Buddies in a row" and 300-pull pick indicators.
 - Unit test for `layout.js` / OCR in headless browser (needs single-worker harness).
 - Optional: PWA/offline, delete single pull, edit pull after import.

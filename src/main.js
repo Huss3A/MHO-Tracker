@@ -126,9 +126,9 @@ function viewHistory() {
     const a = analyse(state.pulls.filter((p) => p.banner === b), b, state.settings.rules), rl = a.rules;
     return `<div class="card bcard">
       <div class="row"><h2 class="grow bname">${esc(b)}</h2><button data-open="${esc(b)}">Open record &rarr;</button></div>
-      ${sumTable(b, a.list, b)}${chipsOf(a.list, rl.ssrPity)}
       <div class="row pills"><span class="pillstat"><b class="SSR">${a.sinceSSR}</b> / ${rl.ssrPity} SSR pity</span><span class="pillstat"><b class="SR">${a.sinceSR}</b> / ${rl.srPity} SR pity</span>
       ${rl.selectorAt ? `<span class="pillstat"><b>${a.total % rl.selectorAt}</b> / ${rl.selectorAt} selector</span>` : ''}<span class="pillstat">${a.total} pulls</span></div>
+      ${sumTable(b, a.list, b)}${chipsOf(a.list, rl.ssrPity)}
     </div>`;
   }).join('')}</div>`;
 }

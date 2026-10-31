@@ -42,9 +42,10 @@ assert.equal(a.list[0].pity, 3); assert.equal(a.sinceSSR, 0); assert.equal(a.ssr
 const sch = loadSchedule({ timezone: '+03:00', banners: [
   { name: 'Midori', type: 'Featured', start: '2026-10-29', end: '2026-11-26' },
   { name: 'Freya', type: 'Featured', start: '2026-11-27', end: '2027-01-21' }] });
-assert.equal(periodFor(sch, 'Featured', '2026/11/26 23:59:59').name, 'Midori', 'end date is inclusive');
-assert.equal(periodFor(sch, 'Featured', '2026/11/27 00:00:00').name, 'Freya');
-assert.equal(periodFor(sch, 'Featured', '2026/10/28 23:59:59'), null);
+assert.equal(periodFor(sch, 'Featured', '2026/11/27 04:59:59').name, 'Midori', 'end date is inclusive up to the 05:00 reset');
+assert.equal(periodFor(sch, 'Featured', '2026/11/27 05:00:00').name, 'Freya');
+assert.equal(periodFor(sch, 'Featured', '2026/10/29 04:59:59'), null, 'before the 05:00 reset of the start date');
+assert.equal(periodFor(sch, 'Featured', '2026/10/29 05:00:00').name, 'Midori');
 assert.equal(periodFor(sch, 'Rotating', '2026/11/01 00:00:00'), null, 'banner type must match');
 assert.equal(stateOf(sch[0], pullMs('2026/11/01 00:00:00')), 'live');
 assert.equal(stateOf(sch[1], pullMs('2026/11/01 00:00:00')), 'upcoming');

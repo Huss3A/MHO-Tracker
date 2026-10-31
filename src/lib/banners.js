@@ -14,11 +14,11 @@ export function pullMs(time, tz = '+03:00') {
 
 /** schedule JSON -> [{...banner, startMs, endMs}] sorted by start. endMs is exclusive (end of the end date). */
 export function loadSchedule(json) {
-  const tz = json.timezone || '+03:00';
+  const tz = json.timezone || '+03:00', hh = String(json.resetHour ?? 5).padStart(2, '0');
   return json.banners.map((b) => ({
     ...b,
-    startMs: Date.parse(`${b.start}T00:00:00${tz}`),
-    endMs: Date.parse(`${b.end}T00:00:00${tz}`) + DAY,
+    startMs: Date.parse(`${b.start}T${hh}:00:00${tz}`),
+    endMs: Date.parse(`${b.end}T${hh}:00:00${tz}`) + DAY,
   })).sort((a, b) => a.startMs - b.startMs);
 }
 
