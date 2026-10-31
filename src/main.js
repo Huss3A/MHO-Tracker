@@ -65,7 +65,16 @@ function commit() {
   save(); banner = banner || presentBanners()[0]; tab = added ? 'history' : tab; render();
 }
 
-const driveNotice = () => CONFIG.DRIVE_ENABLED ? '' : `<div class="card notice" role="status"><b>Google Drive sync is switched off for now.</b> The app is still waiting for Google's approval, so signing in with Google is unavailable. Your pulls are saved in this browser as usual; use <b>Export JSON</b> below to back them up.</div>`;
+const NOTICE_KEY = 'mho-drive-notice-closed';
+let noticeClosed = false;
+try { noticeClosed = localStorage.getItem(NOTICE_KEY) === '1'; } catch { /* storage blocked: notice just shows every visit */ }
+
+const driveNotice = () => (CONFIG.DRIVE_ENABLED || noticeClosed) ? '' : `<div class="card notice" role="status">
+  <button class="x" id="closeNotice" aria-label="Close this notice">&times;</button>
+  <b>Google Drive sync is switched off for now.</b>
+  <p>Google only lets an app sign people in once its sign-in screen has been approved. This is a free hobby tool without its own website domain, and Google requires one before it will approve the app for everyone, so signing in with Google is unavailable until that is sorted out.</p>
+  <p>Nothing is lost: your pulls are saved in this browser as usual. To back them up or move them to another device, use <b>Export JSON</b> and <b>Import JSON</b> below.</p>
+</div>`;
 
 const viewImport = () => `
 ${driveNotice()}
@@ -361,6 +370,12 @@ function wire() {
   document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; setMenu(false); focusMain = true; render(); window.scrollTo(0, 0); }));
   const psel = $('#psel'); if (psel) psel.onchange = () => { period = psel.value; render(); };
   document.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { filter = b.dataset.filter; render(); }));
+  const closeNotice = $('#closeNotice');
+  if (closeNotice) closeNotice.onclick = () => {
+    noticeClosed = true;
+    try { localStorage.setItem(NOTICE_KEY, '1'); } catch { /* ignore */ }
+    render();
+  };
   const file = $('#file');
   if (file) {
     $('#pick').onclick = () => file.click();

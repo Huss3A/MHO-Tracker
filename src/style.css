@@ -124,4 +124,7 @@ button.chk.on{background:var(--ok);border-color:var(--ok);color:var(--on-pill)}
 input.pg{width:72px;text-align:center}
 img.shot{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:var(--rad);margin:var(--s2) 0}
 
-.card.notice{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--panel))}
+.card.notice{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--panel));position:relative;padding-right:44px}
+.card.notice p{margin:6px 0 0}
+.card.notice button.x{position:absolute;top:6px;right:6px;width:32px;height:32px;padding:0;border:0;background:transparent;color:inherit;font-size:22px;line-height:1;cursor:pointer;border-radius:6px}
+.card.notice button.x:hover{background:color-mix(in srgb,var(--warn) 25%,transparent)}
