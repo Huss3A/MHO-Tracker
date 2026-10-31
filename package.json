@@ -1,0 +1,22 @@
+{
+  "name": "mho-recruit-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser-only recruit history tracker for Monster Hunter Outlanders (screenshot OCR)",
+  "scripts": {
+    "prepare-assets": "node scripts/copy-tess.mjs",
+    "predev": "npm run prepare-assets",
+    "dev": "vite",
+    "prebuild": "npm run prepare-assets",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/test-merge.mjs"
+  },
+  "dependencies": {
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}
