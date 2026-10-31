@@ -41,6 +41,6 @@ Accessibility statement: **Done** (Privacy & about). Known limitations: no scree
 Refund policy, true pricing, Omnibus price history, auto-renewal disclaimers: **not applicable.** The tool is free and sells nothing; there are no prices, subscriptions or payments.
 
 ## Open decisions for the owner
-- Public repo URL / contact method for accessibility and privacy questions (currently a stated placeholder-free sentence).
+- Contact: the Privacy & about page links the GitHub issue tracker (https://github.com/Huss3A/MHO-Tracker/issues); add a private contact if wanted.
 - Whether to name a copyright holder; the footer says "the maintainers of this project".
 - Imprint if the site is operated commercially or promoted in DACH.

@@ -258,7 +258,7 @@ function viewAbout() {
 <div class="card"><h2>Accessibility statement</h2>
   <p>We aim to meet WCAG 2.2 level AA. Checked so far: keyboard-only operation of all views and dialogs, visible focus, page landmarks and a skip link, labelled icon buttons, colour contrast in the light and dark themes (computed from the stylesheet colours), reduced-motion support, and no horizontal scrolling at 375 px width.</p>
   <p><b>Known limitations:</b> not tested with a range of screen readers; the screenshot drop area needs a pointer, but the "choose files" button does the same by keyboard; progress bars are visual (the numbers beside them carry the same information); times use the game's server time (UTC+3).</p>
-  <p><b>Feedback:</b> please report problems through the project's issue tracker. The public contact method will be added here when the repository is published.</p></div>`;
+  <p><b>Feedback:</b> please report problems on the project's <a href="https://github.com/Huss3A/MHO-Tracker/issues" rel="noopener noreferrer" target="_blank">GitHub issue tracker</a>.</p></div>`;
 }
 
 const MENU = [['history', 'Recruit history', '\u{1F4DC}'], ['import', 'Import & data', '\u{1F4E5}'], ['banners', 'Banner schedule', '\u{1F5D3}'], ['about', 'Privacy & about', 'ℹ']];
