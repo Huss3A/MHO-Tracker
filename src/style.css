@@ -123,3 +123,5 @@ button.chk.on{background:var(--ok);border-color:var(--ok);color:var(--on-pill)}
 
 input.pg{width:72px;text-align:center}
 img.shot{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:var(--rad);margin:var(--s2) 0}
+
+.card.notice{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--panel))}

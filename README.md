@@ -103,3 +103,5 @@ to it. Unknown names are kept as read and flagged.
 
 ## Contributing
 Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+> Drive sync is currently **switched off** in the shipped site (notice at the top of Import & data) until Google approves the app. To use it while developing, add `VITE_DRIVE_ENABLED=true` to `.env.local`.

@@ -65,7 +65,10 @@ function commit() {
   save(); banner = banner || presentBanners()[0]; tab = added ? 'history' : tab; render();
 }
 
+const driveNotice = () => CONFIG.DRIVE_ENABLED ? '' : `<div class="card notice" role="status"><b>Google Drive sync is switched off for now.</b> The app is still waiting for Google's approval, so signing in with Google is unavailable. Your pulls are saved in this browser as usual; use <b>Export JSON</b> below to back them up.</div>`;
+
 const viewImport = () => `
+${driveNotice()}
 <div class="card"><h2>Import screenshots</h2>
   <div class="drop" id="drop"><b>Drop screenshots here</b>, paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>, or <button id="pick">choose files</button>
     <input id="file" type="file" accept="image/*" multiple hidden>
@@ -211,9 +214,9 @@ function viewData() {
 <div class="card"><h2>Google Drive sync</h2>
   <p class="note">Stores one hidden file (<code>mho-tracker-data.json</code>) in this app's private appData folder of your own Google Drive. The app cannot see any other Drive file. Screenshots are never uploaded. The Google sign-in script only loads when you press a button below.</p>
   ${CONFIG.GOOGLE_CLIENT_ID ? '' : `<div class="row"><label class="grow">OAuth Client ID <input type="text" id="cid" class="cell" placeholder="xxxx.apps.googleusercontent.com" value="${esc(cid)}"></label><button id="savecid">Save</button></div>`}
-  <div class="row mt"><button class="primary" id="sync" ${cid && !sbusy ? '' : 'disabled'}>Sync now (merge)</button></div>
+  <div class="row mt"><button class="primary" id="sync" ${cid && !sbusy && CONFIG.DRIVE_ENABLED ? '' : 'disabled'}>Sync now (merge)</button></div>
   <p class="note mt">Merge combines both sides and loses nothing. The two buttons below replace one side completely and ask you to confirm first:</p>
-  <div class="row"><button id="push" ${cid && !sbusy ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid && !sbusy ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
+  <div class="row"><button id="push" ${cid && !sbusy && CONFIG.DRIVE_ENABLED ? '' : 'disabled'}>Overwrite Drive with this device</button><button id="pull" ${cid && !sbusy && CONFIG.DRIVE_ENABLED ? '' : 'disabled'}>Overwrite this device with Drive</button></div>
   ${cid ? '' : '<p class="warn note">No Client ID configured yet - see README "Google Drive setup".</p>'}
   <div role="status">${sbusy ? `<p class="log">${esc(sbusy)}</p>` : ''}${slog ? `<p class="log">${esc(slog)}</p>` : ''}</div></div>
 <div class="card"><h2>Pity rules</h2><div class="scroll"><table><tr><th>Banner</th><th>SSR pity</th><th>SR pity</th><th>Source</th></tr>
@@ -321,7 +324,7 @@ function confirmDestructive({ title, intro, rows, risk, confirmLabel }) {
 }
 
 async function runSync(mode) {
-  if (sbusy) return;
+  if (sbusy || !CONFIG.DRIVE_ENABLED) return;
   const fail = (e) => { slog = 'Sync failed: ' + e.message; sbusy = ''; render(); };
   try {
     sbusy = 'Signing in to Google...'; slog = ''; render();
