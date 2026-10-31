@@ -1,3 +1,4 @@
+@font-face{font-family:'Didact Gothic';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/didact-gothic.woff2) format('woff2')}
 :root{--bg:#14120f;--panel:#1f1c17;--panel2:#2a261f;--line:#3a352b;--fg:#e9e2d0;--mut:#9b9482;--accent:#d9a441;
 --R:#6fa8d6;--SR:#a37fe0;--SSR:#e0b24a;--ok:#6cc08b;--warn:#e0a44a;--bad:#e06a5a;
 --pc-g:#6cc08b;--pc-o:#f0a030;--pc-r:#f26a5a;--on-pill:#16120a;
@@ -5,7 +6,7 @@
 @media (prefers-color-scheme:light){:root{--bg:#f4f0e6;--panel:#fff;--panel2:#efe8d8;--line:#d8cfb8;--fg:#2a2519;--mut:#6f6753;--accent:#a8741b;--R:#2f78b3;--SR:#7a4fc0;--SSR:#8f6600;
 --ok:#26733f;--warn:#9a5d00;--bad:#b3362a;--pc-g:#26733f;--pc-o:#9a5d00;--pc-r:#b3362a;--on-pill:#fff}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 'Didact Gothic',system-ui,Segoe UI,Roboto,sans-serif}
 .wrap{max-width:980px;margin:0 auto;padding:var(--s4)}
 h2{font-size:16px;margin:0 0 var(--s2)}
 button,select,input[type=text],input.cell{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:var(--rad);padding:7px var(--s3);min-height:var(--tap);max-width:100%}
@@ -39,7 +40,8 @@ input.cell.narrow{width:70px;min-width:0}
 code{overflow-wrap:anywhere}
 a{color:var(--accent)}
 
-button.icon{font-size:18px;line-height:1;padding:8px var(--s3);min-width:var(--tap)}
+button.icon{display:inline-flex;align-items:center;justify-content:center;padding:0;width:var(--tap)}
+button.icon svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 button.pill{border-radius:999px;padding:6px 18px;font-weight:600}
 button.pill.SSR.on{background:var(--SSR);border-color:var(--SSR);color:var(--on-pill)}
 button.pill.SR.on{background:var(--SR);border-color:var(--SR);color:var(--on-pill)}

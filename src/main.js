@@ -221,9 +221,9 @@ function render() {
   const bs = presentBanners();
   $('#app').innerHTML = `
 <div class="topbar">
-  ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners">&larr;</button>` : `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}">&#9776;</button>`}
+  ${tab === 'detail' ? `<button class="icon" data-tab="history" aria-label="Back to all banners"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4M10 6l-6 6 6 6"/></svg></button>` : `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>`}
   <h1 class="ttl grow">${esc(pageTitle())}</h1>
-  ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}">&#9776;</button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
+  ${tab === 'detail' ? `<button class="icon" id="menu" aria-label="Open menu" aria-expanded="${menuOpen}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>` : tab !== 'import' ? `<button class="primary" data-tab="import">+ Import</button>` : ''}
 </div>
 <div class="scrim ${menuOpen ? 'open' : ''}" id="scrim"></div>
 <nav class="drawer ${menuOpen ? 'open' : ''}" id="drawer" aria-label="Menu">
