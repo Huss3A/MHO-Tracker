@@ -55,3 +55,23 @@ export function fmtCountdown(ms) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d}d ${p(Math.floor((s % 86400) / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
 }
+
+/**
+ * Featured 50:50 record. Rule (game text): 50% the SSR is the featured one, otherwise the NEXT SSR is guaranteed featured.
+ * Win = featured SSR that was not itself guaranteed. Only SSRs inside a scheduled period can be judged;
+ * the guarantee is assumed to carry across Featured banners. `listNewestFirst` comes from analyse().
+ */
+export function fiftyFifty(listNewestFirst, schedule, bannerType) {
+  if (bannerType !== 'Featured') return null;
+  let wins = 0, losses = 0, guaranteed = false;
+  for (const p of listNewestFirst.slice().reverse()) {
+    if (p.rarity !== 'SSR') continue;
+    const per = periodFor(schedule, bannerType, p.time);
+    if (!per) continue;
+    const featured = p.name === per.name;
+    if (guaranteed) guaranteed = false;
+    else if (featured) wins++;
+    else { losses++; guaranteed = true; }
+  }
+  return { wins, losses, pct: wins + losses ? (wins / (wins + losses)) * 100 : null };
+}

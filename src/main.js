@@ -7,7 +7,7 @@ import * as drive from './lib/drive.js';
 import { BANNER_NAMES, BANNERS } from './data/rules.js';
 import { CONFIG } from './config.js';
 import bannersJson from './data/banners.json';
-import { loadSchedule, stateOf, periodStats, fmtCountdown, pullMs } from './lib/banners.js';
+import { loadSchedule, stateOf, periodStats, fmtCountdown, pullMs, fiftyFifty } from './lib/banners.js';
 
 const SCHEDULE = loadSchedule(bannersJson);
 const fmtDate = (ms) => new Date(ms).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -105,9 +105,37 @@ function viewBanners() {
   }).join('')}`;
 }
 
+const colOf = (v, max) => (v / max < 0.5 ? 'g' : v / max < 0.8 ? 'o' : 'r');
+const pct2 = (x) => x.toFixed(2) + '%', av2 = (x) => (x ? x.toFixed(2) : '-');
+
+/** rarity table (+ Featured 50:50 row) for a list from analyse() */
+function sumTable(title, view, bannerType) {
+  const sm = summarise(view), ff = fiftyFifty(view, SCHEDULE, bannerType);
+  const srow = (label, r, extra = '') => `<tr class="${label}"><td>${label}</td><td>${r.count}</td><td>${pct2(r.pct)}</td><td>${av2(r.avg)}</td></tr>${extra}` +
+    (r.types.length > 1 ? r.types.map((t) => `<tr class="${label} sub"><td>&#9492; ${esc(t.type)}</td><td>${t.count}</td><td>${pct2(t.pct)}</td><td>${av2(t.avg)}</td></tr>`).join('') : '');
+  const win = ff && (ff.wins + ff.losses) ? `<tr class="SSR sub"><td>&#9492; Win 50:50</td><td>${ff.wins}</td><td>${pct2(ff.pct)}</td><td></td></tr>` : '';
+  return `<table class="sum"><tr><th>${esc(title)}</th><th>Total</th><th>Percent</th><th>Pity AVG</th></tr>${srow('SSR', sm.SSR, win)}${srow('SR', sm.SR)}${srow('R', sm.R)}</table>`;
+}
+const chipsOf = (view, ssrPity) => `<div class="chips">${view.filter((p) => p.rarity === 'SSR').reverse().map((p) => `<span class="chip">${esc(p.name)} <b class="pc-${colOf(p.pity, ssrPity)}">${p.pity}</b></span>`).join('') || '<span class="note">No SSR yet.</span>'}</div>`;
+
+/** overview: one card per banner type (like paimon.moe stats); click the title for the full record */
 function viewHistory() {
   const bs = presentBanners();
   if (!bs.length) return `<div class="card">No pulls yet. <button class="primary" data-tab="import">Import screenshots</button></div>`;
+  return `<div class="grid">${bs.map((b) => {
+    const a = analyse(state.pulls.filter((p) => p.banner === b), b, state.settings.rules), rl = a.rules;
+    return `<div class="card bcard">
+      <div class="row"><h2 class="grow bname">${esc(b)}</h2><button data-open="${esc(b)}">Open record &rarr;</button></div>
+      ${sumTable(b, a.list, b)}${chipsOf(a.list, rl.ssrPity)}
+      <div class="row pills"><span class="pillstat"><b class="SSR">${a.sinceSSR}</b> / ${rl.ssrPity} SSR pity</span><span class="pillstat"><b class="SR">${a.sinceSR}</b> / ${rl.srPity} SR pity</span>
+      ${rl.selectorAt ? `<span class="pillstat"><b>${a.total % rl.selectorAt}</b> / ${rl.selectorAt} selector</span>` : ''}<span class="pillstat">${a.total} pulls</span></div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function viewDetail() {
+  const bs = presentBanners();
+  if (!bs.length) return viewHistory();
   if (!bs.includes(banner)) banner = bs[0];
   const a = analyse(state.pulls.filter((p) => p.banner === banner), banner, state.settings.rules);
   const rl = a.rules, now = Date.now();
@@ -117,17 +145,13 @@ function viewHistory() {
   const per = sel || periods.find((x) => stateOf(x, now) === 'live');
   const inSel = (p) => !sel || (pullMs(p.time) >= sel.startMs && pullMs(p.time) < sel.endMs);
   const view = a.list.filter(inSel);
-  const sm = summarise(view);
   const tag = (p) => { const x = periods.find((b) => pullMs(p.time) >= b.startMs && pullMs(p.time) < b.endMs); return x ? x.name : ''; };
   const col = (v, max) => (v / max < 0.5 ? 'g' : v / max < 0.8 ? 'o' : 'r');
   const rows = view.filter((p) => !filter || p.rarity === filter);
-  const pct = (x) => x.toFixed(2) + '%', av = (x) => (x ? x.toFixed(2) : '-');
-  const srow = (label, r) => `<tr class="${label}"><td>${label}</td><td>${r.count}</td><td>${pct(r.pct)}</td><td>${av(r.avg)}</td></tr>` +
-    (r.types.length > 1 ? r.types.map((t) => `<tr class="${label} sub"><td>&#9492; ${esc(t.type)}</td><td>${t.count}</td><td>${pct(t.pct)}</td><td>${av(t.avg)}</td></tr>`).join('') : '');
   const sel300 = rl.selectorAt ? Math.floor(a.total / rl.selectorAt) : 0;
   return `
 <div class="card">
-  <div class="row"><select id="bsel" class="title">${bs.map((b) => `<option value="${esc(b)}" ${b === banner ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>
+  <div class="row"><button data-tab="history">&larr; All banners</button><h2 class="bname" style="margin:0">${esc(banner)}</h2>
     ${periods.length ? `<select id="psel" class="grow"><option value="">All ${esc(banner)} banners</option>${periods.map((x) => `<option value="${x.id}" ${x.id === period ? 'selected' : ''}>${esc(x.name)} &middot; ${esc(x.start)} to ${esc(x.end)}</option>`).join('')}</select>` : ''}</div>
   <div style="height:10px"></div>
   ${tile('Lifetime pulls', `${esc(banner)} banner${sel ? ` &middot; list shows ${esc(sel.name)}` : ''}`, a.total)}
@@ -138,9 +162,8 @@ function viewHistory() {
   <div class="note">${rl.verified ? 'Rules from the game\'s own text.' : '<span class="warn">Unverified rules (assumed).</span>'} ${esc(rl.note || '')}${rl.selectorAt ? ' Selector counter = total recruits mod ' + rl.selectorAt + ' (assumed).' : ''}</div>
 </div>
 <div class="card">
-  <table class="sum"><tr><th>${esc(banner)}</th><th>Total</th><th>Percent</th><th>Pity AVG</th></tr>
-  ${srow('SSR', sm.SSR)}${srow('SR', sm.SR)}${srow('R', sm.R)}</table>
-  <div class="chips">${view.filter((p) => p.rarity === 'SSR').reverse().map((p) => `<span class="chip">${esc(p.name)} <b class="pc-${col(p.pity, rl.ssrPity)}">${p.pity}</b></span>`).join('') || '<span class="note">No SSR yet.</span>'}</div>
+  ${sumTable(banner, view, banner)}
+  ${chipsOf(view, rl.ssrPity)}
   <div class="note" style="margin-top:6px">Base rates: SSR ${a.base.SSR}% &middot; SR ${a.base.SR}% &middot; R ${a.base.R}%.</div>
 </div>
 <div class="card">
@@ -173,11 +196,11 @@ ${BANNER_NAMES.map((b) => { const r = { ...BANNERS[b], ...(state.settings.rules[
 
 const MENU = [['history', 'Recruit history'], ['import', 'Import screenshots'], ['banners', 'Banner schedule'], ['data', 'Data & sync']];
 function render() {
-  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'banners' ? viewBanners() : viewData();
+  const view = tab === 'import' ? viewImport() : tab === 'history' ? viewHistory() : tab === 'detail' ? viewDetail() : tab === 'banners' ? viewBanners() : viewData();
   $('#app').innerHTML = `<div class="wrap"><header class="top"><div class="grow"><h1>MH Outlanders - Recruit Tracker</h1>
-<div class="sub">${esc(MENU.find((m) => m[0] === tab)[1])} &middot; screenshots are read on this device only</div></div>
+<div class="sub">${esc((MENU.find((m) => m[0] === tab) || MENU[0])[1])} &middot; screenshots are read on this device only</div></div>
 <div class="menuwrap"><button id="menu" aria-label="Menu" class="icon">&#9776;</button>
-${menuOpen ? `<div class="menu">${MENU.map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}</div></header>${view}</div>`;
+${menuOpen ? `<div class="menu">${MENU.map(([k, l]) => `<button data-tab="${k}" class="${tab === k || (k === 'history' && tab === 'detail') ? 'on' : ''}">${l}</button>`).join('')}</div>` : ''}</div></header>${view}</div>`;
   wire();
 }
 
@@ -202,7 +225,7 @@ async function runSync(mode) {
 function wire() {
   document.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; menuOpen = false; log = ''; render(); }));
   $('#menu').onclick = (e) => { e.stopPropagation(); menuOpen = !menuOpen; render(); };
-  const bsel = $('#bsel'); if (bsel) bsel.onchange = () => { banner = bsel.value; period = ''; render(); };
+  document.querySelectorAll('[data-open]').forEach((b) => (b.onclick = () => { banner = b.dataset.open; period = ''; tab = 'detail'; render(); }));
   const psel = $('#psel'); if (psel) psel.onchange = () => { period = psel.value; render(); };
   document.querySelectorAll('[data-filter]').forEach((b) => (b.onclick = () => { filter = b.dataset.filter; render(); }));
   const file = $('#file');

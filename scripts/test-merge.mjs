@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { mergeChunk, mergePulls } from '../src/lib/merge.js';
 import { analyse } from '../src/lib/pity.js';
-import { loadSchedule, periodFor, periodStats, stateOf, pullMs, fmtCountdown } from '../src/lib/banners.js';
+import { loadSchedule, periodFor, periodStats, fiftyFifty, stateOf, pullMs, fmtCountdown } from '../src/lib/banners.js';
 
 const T = '2026/10/29 05:38:11';
 const r = (name, row, rarity = 'R', time = T) => ({ row, type: 'Buddy', name, rarity, time });
@@ -60,4 +60,10 @@ ps.push(fp(100, 'SSR', 'Midori'));
 st = periodStats(ps, sch[0]);
 assert.equal(st.featuredAt, 101); assert.equal(st.gotFeatured, true); assert.equal(st.toGuarantee, 0);
 assert.equal(periodStats(ps, sch[1]).count, 0, 'pulls of another period are not counted');
+// 50:50: SSRs oldest->newest: Other (loss), Midori (guaranteed, not counted), Midori (win), Other (loss)
+const ff = [['2026/11/01 00:00:04', 'Other'], ['2026/11/01 00:00:03', 'Midori'], ['2026/11/01 00:00:02', 'Midori'], ['2026/11/01 00:00:01', 'Other']]
+  .map(([time, name]) => ({ banner: 'Featured', time, idx: 0, type: 'Adventurer', name, rarity: 'SSR' }));
+const w = fiftyFifty(ff, sch, 'Featured');
+assert.equal(w.wins, 1); assert.equal(w.losses, 2);
+assert.equal(fiftyFifty(ff, sch, 'Standard'), null);
 console.log('all merge/pity tests passed');
